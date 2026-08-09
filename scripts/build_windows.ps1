@@ -2,15 +2,20 @@ $ErrorActionPreference = "Stop"
 $ProjectDir = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectDir
 
-& .\.venv\Scripts\python.exe scripts\generate_icons.py
+$PythonExecutable = ".\.venv\Scripts\python.exe"
+if (-not (Test-Path $PythonExecutable)) {
+    $PythonExecutable = (Get-Command python -ErrorAction Stop).Source
+}
+
+& $PythonExecutable scripts\generate_icons.py
 $WebViewBootstrapper = "packaging\windows\MicrosoftEdgeWebview2Setup.exe"
 if (-not (Test-Path $WebViewBootstrapper)) {
     Invoke-WebRequest `
         -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" `
         -OutFile $WebViewBootstrapper
 }
-& .\.venv\Scripts\python.exe -m PyInstaller --clean --noconfirm interview_loom.spec
-$AppVersion = & .\.venv\Scripts\python.exe -c "from app.metadata import APP_VERSION; print(APP_VERSION)"
+& $PythonExecutable -m PyInstaller --clean --noconfirm interview_loom.spec
+$AppVersion = & $PythonExecutable -c "from app.metadata import APP_VERSION; print(APP_VERSION)"
 
 $CertificatePath = Join-Path $env:TEMP "interview-loom-signing.pfx"
 $SignTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1

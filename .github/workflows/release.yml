@@ -58,7 +58,7 @@ jobs:
             echo "MACOS_SIGNING_IDENTITY=$MACOS_SIGNING_IDENTITY_SECRET" >> "$GITHUB_ENV"
           fi
       - name: Build macOS application
-        run: ./scripts/build_macos.sh
+        run: bash scripts/build_macos.sh
       - name: Smoke-test macOS executable
         run: '"dist/Interview Loom.app/Contents/MacOS/Interview Loom" --smoke-test'
       - name: Notarize macOS DMG when configured
@@ -108,7 +108,7 @@ jobs:
         run: |
           $InstallDir = Join-Path $env:RUNNER_TEMP "Interview Loom Installed"
           $Installer = Resolve-Path "release\Interview-Loom-Setup-x64.exe"
-          $Install = Start-Process $Installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$InstallDir" -Wait -PassThru
+          $Install = Start-Process $Installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=`"$InstallDir`"" -Wait -PassThru
           if ($Install.ExitCode -ne 0) { throw "Installer exit code: $($Install.ExitCode)" }
           $InstalledExe = Join-Path $InstallDir "Interview Loom.exe"
           if (-not (Test-Path $InstalledExe)) { throw "Installed executable is missing" }
@@ -122,7 +122,7 @@ jobs:
         run: (Get-FileHash release/Interview-Loom-Setup-x64.exe -Algorithm SHA256).Hash.ToLower() + "  Interview-Loom-Setup-x64.exe" | Set-Content release/Interview-Loom-Windows-x64.sha256
       - name: Generate Windows release manifest
         shell: pwsh
-        run: .venv\Scripts\python.exe scripts\create_release_manifest.py --platform Windows --architecture x64 --output release\Interview-Loom-Windows-x64.manifest.json release\Interview-Loom-Setup-x64.exe
+        run: python scripts\create_release_manifest.py --platform Windows --architecture x64 --output release\Interview-Loom-Windows-x64.manifest.json release\Interview-Loom-Setup-x64.exe
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64

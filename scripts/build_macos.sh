@@ -2,7 +2,13 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PYTHON_BIN="$PROJECT_DIR/.venv/bin/python"
+if [[ -x "$PROJECT_DIR/.venv/bin/python" ]]; then
+    PYTHON_BIN="$PROJECT_DIR/.venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+else
+    PYTHON_BIN="$(command -v python)"
+fi
 APP_PATH="$PROJECT_DIR/dist/Interview Loom.app"
 RELEASE_DIR="$PROJECT_DIR/release"
 ZIP_PATH="$RELEASE_DIR/Interview-Loom-macOS-arm64.zip"
@@ -13,8 +19,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
     exit 1
 fi
 
-if [[ ! -x "$PYTHON_BIN" ]]; then
-    echo "Не найдено виртуальное окружение .venv."
+if [[ -z "$PYTHON_BIN" || ! -x "$PYTHON_BIN" ]]; then
+    echo "Не найден Python для сборки."
     exit 1
 fi
 
