@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+
+# Runtime data
+data/*.db
+data/*.sqlite*
+data/uploads/
+data/models/
+uploads/
+*.db
+*.sqlite*
+*.db.backup-*
+
+# Generated media and ML artifacts
+*.webm
+*.mp4
+*.mov
+*.wav
+*.mp3
+*.pkl
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Build artifacts
+.build/
+build/
+dist/
+release/
+public/
+*.egg-info/
+*.log
+packaging/windows/MicrosoftEdgeWebview2Setup.exe
