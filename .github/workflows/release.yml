@@ -102,7 +102,9 @@ jobs:
         run: ./scripts/build_windows.ps1
       - name: Smoke-test Windows executable
         shell: pwsh
-        run: '& "dist\Interview Loom\Interview Loom.exe" --smoke-test'
+        run: |
+          $Smoke = Start-Process "dist\Interview Loom\Interview Loom.exe" -ArgumentList "--smoke-test" -Wait -PassThru
+          if ($Smoke.ExitCode -ne 0) { throw "Portable smoke-test exit code: $($Smoke.ExitCode)" }
       - name: Verify Windows install, launch, and uninstall
         shell: pwsh
         run: |
@@ -112,10 +114,14 @@ jobs:
           if ($Install.ExitCode -ne 0) { throw "Installer exit code: $($Install.ExitCode)" }
           $InstalledExe = Join-Path $InstallDir "Interview Loom.exe"
           if (-not (Test-Path $InstalledExe)) { throw "Installed executable is missing" }
-          & $InstalledExe --smoke-test
+          $InstalledSmoke = Start-Process $InstalledExe -ArgumentList "--smoke-test" -Wait -PassThru
+          if ($InstalledSmoke.ExitCode -ne 0) { throw "Installed smoke-test exit code: $($InstalledSmoke.ExitCode)" }
           $Uninstaller = Join-Path $InstallDir "unins000.exe"
           $Uninstall = Start-Process $Uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
           if ($Uninstall.ExitCode -ne 0) { throw "Uninstaller exit code: $($Uninstall.ExitCode)" }
+          for ($Attempt = 0; $Attempt -lt 20 -and (Test-Path $InstalledExe); $Attempt++) {
+            Start-Sleep -Milliseconds 500
+          }
           if (Test-Path $InstalledExe) { throw "Uninstall did not remove the executable" }
       - name: Generate checksum
         shell: pwsh

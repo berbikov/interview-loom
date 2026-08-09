@@ -28,11 +28,15 @@ HIDDEN_IMPORTS = [
 
 for package_name in (
     "av",
+    "charset_normalizer",
+    "cryptography",
     "ctranslate2",
     "faster_whisper",
+    "google.auth",
     "google.genai",
     "keyring",
     "onnxruntime",
+    "requests",
     "tokenizers",
     "webview",
 ):
