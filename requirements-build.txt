@@ -1,0 +1,4 @@
+-r requirements-desktop.txt
+
+pyinstaller>=6.15,<7.0
+Pillow>=11.2,<13.0

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Новая тренировка — Interview Loom{% endblock %}
+
+{% block content %}
+<section class="studio-intro">
+    <div>
+        <a class="back-link" href="/">← На главную</a>
+        <p class="section-kicker">Студия записи</p>
+        <h1>Расскажите.<br><em>Мы поможем улучшить.</em></h1>
+    </div>
+    <div class="studio-steps" aria-label="Этапы тренировки">
+        <span class="active"><i>1</i> Контекст</span><b></b><span><i>2</i> Запись</span><b></b><span><i>3</i> Разбор</span>
+    </div>
+</section>
+
+<section class="studio-layout">
+    <div class="context-panel">
+        <div class="panel-heading"><span>01</span><div><h2>Контекст интервью</h2><p>Чем точнее вводные, тем полезнее будет AI-разбор.</p></div></div>
+        <form id="recording-form" class="metadata-form">
+            <label>
+                <span>Название тренировки</span>
+                <input id="title" name="title" type="text" maxlength="200" placeholder="Например, финальное интервью в продуктовую команду" required>
+            </label>
+            <div class="form-grid">
+                <label>
+                    <span>Должность</span>
+                    <input id="role" name="role" type="text" maxlength="200" placeholder="Product Manager" required>
+                </label>
+                <label>
+                    <span>Фокус тренировки <small>необязательно</small></span>
+                    <input type="text" value="Поведенческий вопрос" disabled aria-label="Фокус тренировки">
+                </label>
+            </div>
+            <label>
+                <span>Вопрос интервьюера</span>
+                <textarea id="interview-question" name="interview_question" maxlength="5000" rows="4" placeholder="Расскажите о сложном проекте и вашей роли в нём" required></textarea>
+                <small class="field-hint">Ответьте так, как отвечали бы на настоящем интервью.</small>
+            </label>
+            <label>
+                <span>Описание вакансии <small>необязательно</small></span>
+                <textarea id="job-description" name="job_description" maxlength="10000" rows="3" placeholder="Вставьте ключевые требования — Gemini учтёт их в рекомендациях"></textarea>
+            </label>
+
+            <fieldset class="mode-fieldset">
+                <legend>Что записываем</legend>
+                <div class="mode-grid">
+                    <label class="mode-option">
+                        <input type="radio" name="recording_mode" value="camera" checked>
+                        <span class="mode-icon">◉</span><span><strong>Камера</strong><small>Камера + микрофон</small></span><i>✓</i>
+                    </label>
+                    <label class="mode-option">
+                        <input type="radio" name="recording_mode" value="screen">
+                        <span class="mode-icon">▣</span><span><strong>Экран</strong><small>Экран + микрофон</small></span><i>✓</i>
+                    </label>
+                    <label class="mode-option">
+                        <input type="radio" name="recording_mode" value="screen-camera">
+                        <span class="mode-icon">◫</span><span><strong>Вместе</strong><small>Экран + камера</small></span><i>✓</i>
+                    </label>
+                </div>
+            </fieldset>
+        </form>
+        <div class="privacy-note"><span>⌁</span><p><strong>Приватно по умолчанию.</strong> Видео хранится локально. В Gemini отправляется только текст расшифровки и контекст вопроса.</p></div>
+    </div>
+
+    <div class="recorder-card">
+        <div class="source-switch" role="tablist" aria-label="Источник видео">
+            <button id="record-source-button" class="source-switch-button active" type="button" role="tab" aria-selected="true">Записать сейчас</button>
+            <button id="file-source-button" class="source-switch-button" type="button" role="tab" aria-selected="false">Загрузить видео</button>
+        </div>
+        <section
+            id="file-upload-panel"
+            class="file-upload-panel"
+            data-max-size="{{ max_upload_size_bytes }}"
+            hidden
+        >
+            <input id="video-file-input" type="file" accept="video/webm,video/mp4,video/quicktime,audio/webm" hidden>
+            <button id="file-drop-zone" class="file-drop-zone" type="button">
+                <span class="file-upload-icon">↓</span>
+                <strong>Перетащите готовое видео</strong>
+                <small>или нажмите, чтобы выбрать WebM, MP4 или MOV</small>
+                <em>До {{ (max_upload_size_bytes / 1024 / 1024) | int }} МБ</em>
+            </button>
+        </section>
+        <div id="recording-panel">
+        <div class="recorder-topline"><div><span class="live-dot"></span> Preview</div><span>HD · 16:9</span></div>
+        <div class="video-frame">
+            <video id="live-video" autoplay muted playsinline aria-label="Изображение с камеры"></video>
+            <canvas id="mix-canvas" width="1280" height="720" hidden></canvas>
+            <div id="camera-placeholder" class="video-placeholder"><span class="placeholder-camera">◉</span><strong>Камера выключена</strong><small>Заполните контекст и начните запись</small></div>
+            <span id="recording-indicator" class="recording-indicator" hidden>Запись</span>
+            <span id="recording-timer" class="recording-timer">00:00</span>
+        </div>
+
+        <div class="controls" aria-label="Управление записью">
+            <button id="start-button" class="button button-dark record-cta" type="button"><span class="record-dot"></span> Начать запись</button>
+            <button id="pause-button" class="icon-button" type="button" disabled aria-label="Пауза">Ⅱ <span>Пауза</span></button>
+            <button id="stop-button" class="icon-button stop-control" type="button" disabled aria-label="Остановить">■ <span>Стоп</span></button>
+        </div>
+
+        </div>
+        <p id="status-message" class="status-message" role="status">Подготовьте контекст слева, затем включите камеру.</p>
+
+        <section id="preview-section" class="preview-section upload-zone" hidden>
+            <div class="preview-heading"><div><span>✓</span><h2 id="preview-title">Запись готова</h2></div><small id="preview-file-name">Проверьте звук и изображение</small></div>
+            <video id="preview-video" controls playsinline aria-label="Предварительный просмотр записи"></video>
+            <div class="preview-actions"><button id="upload-button" class="button button-dark button-large full-width" type="button">Загрузить и проанализировать <span>↗</span></button><button id="reset-media-button" class="button button-light full-width" type="button">Удалить и выбрать заново</button><p>После загрузки начнётся расшифровка и AI-разбор</p></div>
+        </section>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', path='/js/recorder.js') }}?v={{ app_version }}" defer></script>{% endblock %}

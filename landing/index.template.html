@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Interview Loom — desktop AI-тренажёр собеседований с локальной видеозаписью, расшифровкой и персональным разбором.">
+    <meta name="theme-color" content="#f7f7f4">
+    <link rel="canonical" href="{{SITE_URL}}/">
+    <meta property="og:title" content="Interview Loom — отвечайте увереннее">
+    <meta property="og:description" content="Запишите или загрузите тренировочный ответ и получите расшифровку и строгий AI-разбор.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{SITE_URL}}/">
+    <meta property="og:image" content="{{SITE_URL}}/app-icon.png">
+    <title>Interview Loom — AI-тренажёр интервью</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <a class="brand" href="./"><img src="app-icon.png" alt="" width="38" height="38"><span>Interview Loom</span></a>
+        <nav><a href="#how">Как работает</a><a href="#privacy">Приватность</a><a class="nav-button" href="#download">Скачать</a></nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-copy">
+                <span class="eyebrow">Персональный AI-разбор интервью</span>
+                <h1>Отвечайте так,<br><em>чтобы вас запомнили.</em></h1>
+                <p>Запишите или загрузите тренировочный ответ. Interview Loom переведёт речь в текст, строго оценит аргументацию и покажет, как сделать ответ сильнее.</p>
+                <div class="hero-actions"><a class="button primary" href="#download">Скачать бесплатно</a><a class="text-link" href="#how">Как это работает ↓</a></div>
+                <small>Без регистрации · Видео остаётся на вашем компьютере</small>
+            </div>
+            <div class="result-demo" aria-label="Пример анализа">
+                <div class="window-bar"><i></i><i></i><i></i><span>Разбор ответа</span></div>
+                <div class="demo-heading"><div><small>PRODUCT MANAGER</small><h2>Сложный проект</h2></div><strong>8.2<small>/10</small></strong></div>
+                <div class="metrics"><span>Структура <b>8</b><i style="--score:80%"></i></span><span>Ясность <b>9</b><i style="--score:90%"></i></span><span>Конкретика <b>7</b><i style="--score:70%"></i></span></div>
+                <div class="insight"><b>→</b><p><small>Главная рекомендация</small>Добавьте измеримый результат проекта и завершите ответ коротким выводом.</p></div>
+            </div>
+        </section>
+
+        <section id="how" class="section">
+            <div class="section-title process-title"><span>Как это работает</span><h2>Одна тренировка.<br>Десятки точек роста.</h2></div>
+            <div class="steps">
+                <article><span>01</span><div class="step-mark record-mark">●</div><h3>Запись или файл</h3><p>Камера, экран, микрофон или готовое видео.</p></article>
+                <article><span>02</span><div class="step-mark transcript-mark">≡</div><h3>Локальная расшифровка</h3><p>faster-whisper переводит речь в текст на вашем компьютере.</p></article>
+                <article><span>03</span><div class="step-mark score-mark">8.2</div><h3>AI-разбор</h3><p>Оценки, аргументы, рекомендации и версия ответа сильнее.</p></article>
+                <article class="planned-step"><div><span>04</span><small>В разработке</small></div><div class="step-mark chat-mark">—?</div><h3>AI Chat</h3><p>Можно будет спросить, откуда взялась оценка и как усилить конкретную фразу.</p></article>
+            </div>
+        </section>
+
+        <section class="key-section" aria-labelledby="key-title">
+            <div class="key-copy">
+                <span>Настройки AI</span>
+                <h2 id="key-title">Ваш AI.<br><em>Ваш ключ.</em></h2>
+                <p>Подключите собственный Gemini API key. Он используется для разбора расшифровки и контекста вопроса.</p>
+            </div>
+            <div class="settings-mock" aria-label="Фрагмент настроек Gemini API key">
+                <div class="settings-path"><span>Настройки</span><b>/</b><span>AI</span></div>
+                <div class="settings-heading"><div><small>Подключение</small><h3>Gemini API Key</h3></div><span class="key-state">Не добавлен</span></div>
+                <label>Новый API-ключ</label>
+                <div class="mock-input"><span>••••••••••••••••••••</span><b>Показать</b></div>
+                <p>Ключ проверится при следующем анализе.</p>
+                <button type="button" tabindex="-1">Сохранить ключ</button>
+            </div>
+        </section>
+
+        <section id="privacy" class="privacy">
+            <div><span>Приватность по умолчанию</span><h2>Ваше видео<br>остаётся вашим.</h2></div>
+            <div class="privacy-list"><p><b>01</b> Видео и база хранятся локально</p><p><b>02</b> В Gemini отправляется только текст</p><p><b>03</b> API key защищён Keychain или Credential Locker</p></div>
+        </section>
+
+        <section id="download" class="download">
+            <div class="download-copy">
+                <span>Interview Loom 1.0</span><h2>Тренируйтесь<br>в отдельном приложении.</h2><p>Установите приложение, подключите Gemini и начинайте тренировку.</p>
+                <div class="download-buttons"><a class="button light" href="{{MAC_DOWNLOAD_URL}}">Скачать для macOS</a><a class="button outline" href="{{WINDOWS_DOWNLOAD_URL}}">Скачать для Windows</a></div>
+                <small>macOS 12+ (Apple Silicon) · Windows 10/11 x64 · <a href="support.html">Другие версии</a></small>
+            </div>
+            <div class="answer-fragment" aria-label="Фрагмент AI-разбора Interview Loom">
+                <div class="fragment-top"><span>Версия сильнее</span><b>03</b></div>
+                <p>«Я отвечал за запуск эксперимента: сформулировал гипотезу, собрал команду и за шесть недель поднял конверсию на 14%.»</p>
+                <div class="follow-up"><small>Следующий вопрос интервьюера</small><strong>Как именно вы измеряли результат?</strong></div>
+            </div>
+        </section>
+    </main>
+
+    <footer><div class="brand"><img src="app-icon.png" alt="" width="34" height="34"><span>Interview Loom</span></div><div><a href="privacy.html">Приватность</a><a href="terms.html">Условия</a><a href="support.html">Поддержка</a></div><p>Для тренировки и анализа после ответа. Не предназначено для скрытых подсказок.</p></footer>
+</body>
+</html>

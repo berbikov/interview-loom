@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки — Interview Loom{% endblock %}
+
+{% block content %}
+<section class="settings-page">
+    <div class="settings-heading">
+        <a class="back-link" href="/">← На главную</a>
+        <p class="section-kicker">Персональные настройки</p>
+        <h1>Подключите<br><em>свой Gemini.</em></h1>
+        <p>Ключ нужен только для AI-разбора текста. Видео в Gemini не отправляется.</p>
+    </div>
+
+    <article class="settings-card">
+        <div class="settings-card-heading">
+            <div><span class="settings-icon">✦</span><div><h2>Gemini API key</h2><p>Хранится в системном защищённом хранилище.</p></div></div>
+            <span id="gemini-key-status" class="key-status {{ 'configured' if gemini_configured else '' }}">{{ 'Сохранён' if gemini_configured else 'Не добавлен' }}</span>
+        </div>
+
+        {% if settings_editable %}
+        <form id="gemini-settings-form" class="settings-form">
+            <label for="gemini-api-key">Новый API-ключ</label>
+            <div class="secret-input-row">
+                <input id="gemini-api-key" type="password" minlength="8" maxlength="500" autocomplete="off" placeholder="Введите ключ из Google AI Studio" required>
+                <button id="toggle-key-visibility" class="button button-light" type="button">Показать</button>
+            </div>
+            <p class="field-hint">Существующий ключ никогда не отображается и не возвращается через API.</p>
+            <div class="settings-actions">
+                <button id="save-gemini-key" class="button button-dark" type="submit">Сохранить ключ</button>
+                <button id="delete-gemini-key" class="button button-light" type="button" {% if not gemini_configured %}disabled{% endif %}>Удалить ключ</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="server-settings-note"><p>В серверном режиме ключ задаётся администратором через переменную окружения <code>GEMINI_API_KEY</code>.</p></div>
+        {% endif %}
+        <p id="settings-message" class="status-message {{ 'error' if settings_error else '' }}" role="status">{{ settings_error or ('Ключ сохранён. Его доступность проверится при следующем анализе.' if gemini_configured else 'Добавьте ключ, чтобы получать оценки и рекомендации.') }}</p>
+    </article>
+
+    <article class="privacy-settings-card">
+        <span>⌁</span><div><h2>Что отправляется в Gemini</h2><p>Только расшифровка, вопрос интервьюера, должность и необязательное описание вакансии. Видео и API-ключ не сохраняются в результатах.</p></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', path='/js/settings.js') }}?v={{ app_version }}" defer></script>{% endblock %}

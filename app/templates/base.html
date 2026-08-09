@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Interview Loom — AI-тренажёр собеседований с видеозаписью, транскрипцией и персональным разбором">
+    <meta name="theme-color" content="#f7f7f4">
+    <title>{% block title %}Interview Loom — AI-тренажёр интервью{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}?v={{ app_version }}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="/" aria-label="Interview Loom — на главную">
+                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span>Interview Loom</span>
+            </a>
+            <nav class="main-nav" aria-label="Основная навигация">
+                <a href="/#how-it-works">Как работает</a>
+                <a href="/#recent">Мои записи</a>
+                {% if request.app.state.desktop_mode %}<a href="/settings">Настройки</a>{% endif %}
+                {% if not request.app.state.desktop_mode %}<a href="/#download">Скачать</a>{% endif %}
+                <a class="nav-cta" href="/record">Новая запись <span>↗</span></a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page-shell">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <a class="brand" href="/">
+                    <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span>Interview Loom</span>
+                </a>
+                <p>Спокойная практика перед важным разговором.</p>
+            </div>
+            <div class="footer-links">
+                <div><span>Продукт</span><a href="/record">Записать ответ</a><a href="/#how-it-works">Как работает</a>{% if not request.app.state.desktop_mode %}<a href="/#download">Скачать приложение</a>{% endif %}</div>
+                <div><span>Разработка</span><a href="/docs">API</a><a href="/health">Health-check</a>{% if request.app.state.desktop_mode %}<a href="/settings">Настройки</a>{% endif %}</div>
+            </div>
+            <p class="footer-note">Для тренировки и анализа после ответа. Не предназначено для скрытых подсказок во время реального интервью.</p>
+        </div>
+    </footer>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

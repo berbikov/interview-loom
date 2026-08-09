@@ -1,0 +1,151 @@
+name: Desktop release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag, for example v1.0.0"
+        required: true
+        default: "v1.0.0"
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.1.0' }}
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest
+
+  macos-arm64:
+    needs: tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Import Apple signing certificate when configured
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY_SECRET: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          if [ -n "$MACOS_CERTIFICATE_BASE64" ]; then
+            echo "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/interview-loom.p12"
+            security create-keychain -p actions "$RUNNER_TEMP/interview-loom.keychain-db"
+            security set-keychain-settings -lut 21600 "$RUNNER_TEMP/interview-loom.keychain-db"
+            security unlock-keychain -p actions "$RUNNER_TEMP/interview-loom.keychain-db"
+            security import "$RUNNER_TEMP/interview-loom.p12" -k "$RUNNER_TEMP/interview-loom.keychain-db" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            security list-keychains -d user -s "$RUNNER_TEMP/interview-loom.keychain-db"
+            echo "MACOS_SIGNING_IDENTITY=$MACOS_SIGNING_IDENTITY_SECRET" >> "$GITHUB_ENV"
+          fi
+      - name: Build macOS application
+        run: ./scripts/build_macos.sh
+      - name: Smoke-test macOS executable
+        run: '"dist/Interview Loom.app/Contents/MacOS/Interview Loom" --smoke-test'
+      - name: Notarize macOS DMG when configured
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          if [ -n "$APPLE_ID" ] && [ -f release/Interview-Loom-macOS-arm64.dmg ]; then
+            xcrun notarytool submit release/Interview-Loom-macOS-arm64.dmg --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+            xcrun stapler staple release/Interview-Loom-macOS-arm64.dmg
+          fi
+      - name: Generate checksums
+        run: shasum -a 256 release/Interview-Loom-macOS-arm64.* > release/Interview-Loom-macOS-arm64.sha256
+      - name: Generate macOS release manifest
+        run: python scripts/create_release_manifest.py --platform macOS --architecture arm64 --output release/Interview-Loom-macOS-arm64.manifest.json release/Interview-Loom-macOS-arm64.zip release/Interview-Loom-macOS-arm64.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: release/Interview-Loom-macOS-arm64.*
+          if-no-files-found: error
+
+  windows-x64:
+    needs: tests
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - name: Build Windows application
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: ./scripts/build_windows.ps1
+      - name: Smoke-test Windows executable
+        shell: pwsh
+        run: '& "dist\Interview Loom\Interview Loom.exe" --smoke-test'
+      - name: Verify Windows install, launch, and uninstall
+        shell: pwsh
+        run: |
+          $InstallDir = Join-Path $env:RUNNER_TEMP "Interview Loom Installed"
+          $Installer = Resolve-Path "release\Interview-Loom-Setup-x64.exe"
+          $Install = Start-Process $Installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$InstallDir" -Wait -PassThru
+          if ($Install.ExitCode -ne 0) { throw "Installer exit code: $($Install.ExitCode)" }
+          $InstalledExe = Join-Path $InstallDir "Interview Loom.exe"
+          if (-not (Test-Path $InstalledExe)) { throw "Installed executable is missing" }
+          & $InstalledExe --smoke-test
+          $Uninstaller = Join-Path $InstallDir "unins000.exe"
+          $Uninstall = Start-Process $Uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          if ($Uninstall.ExitCode -ne 0) { throw "Uninstaller exit code: $($Uninstall.ExitCode)" }
+          if (Test-Path $InstalledExe) { throw "Uninstall did not remove the executable" }
+      - name: Generate checksum
+        shell: pwsh
+        run: (Get-FileHash release/Interview-Loom-Setup-x64.exe -Algorithm SHA256).Hash.ToLower() + "  Interview-Loom-Setup-x64.exe" | Set-Content release/Interview-Loom-Windows-x64.sha256
+      - name: Generate Windows release manifest
+        shell: pwsh
+        run: .venv\Scripts\python.exe scripts\create_release_manifest.py --platform Windows --architecture x64 --output release\Interview-Loom-Windows-x64.manifest.json release\Interview-Loom-Setup-x64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: |
+            release/Interview-Loom-Setup-x64.exe
+            release/Interview-Loom-Windows-x64.sha256
+            release/Interview-Loom-Windows-x64.manifest.json
+          if-no-files-found: error
+
+  publish:
+    needs: [macos-arm64, windows-x64]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" release-files/* --clobber
+          else
+            gh release create "${RELEASE_TAG}" release-files/* --generate-notes --target "${GITHUB_SHA}"
+          fi

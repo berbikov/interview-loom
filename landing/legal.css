@@ -1,0 +1,25 @@
+.legal-page {
+    max-width: 980px;
+}
+
+.legal-copy {
+    color: var(--muted);
+    font-size: 1.08rem;
+    line-height: 1.7;
+    max-width: 760px;
+}
+
+.legal-copy h3 {
+    color: var(--ink);
+    font-size: 1.35rem;
+    margin: 32px 0 6px;
+}
+
+.legal-copy strong,
+.legal-copy a {
+    color: var(--ink);
+}
+
+.legal-copy code {
+    font-size: .9em;
+}

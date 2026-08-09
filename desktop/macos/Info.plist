@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>ru</string>
+    <key>CFBundleDisplayName</key>
+    <string>Interview Loom</string>
+    <key>CFBundleExecutable</key>
+    <string>Interview Loom</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.interviewloom.desktop</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Interview Loom</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.0.0-dev</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Камера нужна для записи тренировочного интервью.</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Микрофон нужен для записи ответа на тренировочном интервью.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Запись экрана используется только по вашему выбору во время тренировочного интервью.</string>
+</dict>
+</plist>

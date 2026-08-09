@@ -1,0 +1,6 @@
+-r requirements.txt
+
+pywebview==6.2.1
+platformdirs>=4.3,<5.0
+keyring>=25.6,<26.0
+filelock>=3.18,<4.0

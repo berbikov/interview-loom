@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Interview Loom">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e9e1f3"/>
+      <stop offset="1" stop-color="#dce9f5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#background)"/>
+  <rect x="174" y="174" width="676" height="676" rx="182" fill="#171816"/>
+  <circle cx="392" cy="512" r="92" fill="#dff1ad"/>
+  <path d="M520 344h74v336h-74zM642 410h74v270h-74z" fill="#fff"/>
+  <circle cx="679" cy="344" r="37" fill="#f58b7c"/>
+</svg>

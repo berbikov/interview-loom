@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Версия для {{ platform_name or 'Mac' }} собирается — Interview Loom{% endblock %}
+{% block content %}
+<section class="not-found-page download-waiting">
+    <span class="download-glyph">⌘</span>
+    <p class="section-kicker">Interview Loom для {{ platform_name or 'macOS' }}</p>
+    <h1>Сборка ещё не готова</h1>
+    <p>Версия для Mac появится здесь после локальной сборки. Пока можно пользоваться веб-версией — все основные возможности уже доступны.</p>
+    <div><a class="button button-dark" href="/record">Открыть веб-приложение</a><a class="button button-light" href="/">На лендинг</a></div>
+</section>
+{% endblock %}

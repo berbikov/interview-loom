@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{{ recording.title }} — результат{% endblock %}
+
+{% block content %}
+<section class="result-header">
+    <div>
+        <a class="back-link" href="/">← Все записи</a>
+        <div class="result-title-row">
+            <div><p class="section-kicker">AI-разбор интервью</p><h1>{{ recording.title }}</h1></div>
+            <span id="header-status" class="header-status status-{{ recording.status }}">{{ {'uploaded':'В очереди','transcribing':'Транскрибация','analyzing':'AI-анализ','completed':'Готово','failed':'Ошибка'}.get(recording.status, recording.status) }}</span>
+        </div>
+        <div class="result-meta-line"><span>{{ recording.role }}</span><i></i><span>{{ recording.created_at.strftime('%d.%m.%Y · %H:%M') }}</span><i></i><span id="recording-duration">{{ recording.duration_seconds | round(1) }} сек.</span></div>
+    </div>
+    <a class="button button-dark" href="/record">Новая тренировка <span>+</span></a>
+</section>
+
+<section
+    id="processing-panel"
+    class="processing-panel status-{{ recording.status }}"
+    data-public-id="{{ recording.public_id }}"
+    data-initial-status="{{ recording.status }}"
+    data-initial-analysis="{{ recording.analysis_json | e if recording.analysis_json else '' }}"
+    data-gemini-configured="{{ 'true' if gemini_configured else 'false' }}"
+>
+    <div class="processing-icon"><span></span><i></i></div>
+    <div class="processing-copy"><div><p class="processing-overline">Статус обработки</p><h2 id="processing-title">Подготавливаем запись</h2></div><p id="processing-message" role="status">Проверяем загруженный файл…</p></div>
+    <span id="status-badge" class="status-badge">{{ recording.status }}</span>
+    <div id="progress-track" class="progress-track" role="progressbar" aria-label="Прогресс обработки" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10"><span id="progress-bar" class="progress-bar"></span></div>
+    <p id="processing-error" class="processing-error" role="alert" {% if not recording.error_message %}hidden{% endif %}>{{ recording.error_message or '' }}</p>
+    <button id="reanalyze-button" class="button button-light reanalyze-button" type="button">Повторить обработку <span>↻</span></button>
+</section>
+
+<section class="result-media-grid">
+    <div class="result-video-card">
+        <div class="card-topline"><span>Видеозапись</span><small>{{ recording.video_mime_type }}</small></div>
+        <div class="result-video-frame"><video controls playsinline preload="metadata"><source src="/recordings/{{ recording.public_id }}/media" type="{{ recording.video_mime_type }}">Ваш браузер не поддерживает просмотр видео.</video></div>
+    </div>
+    <article class="question-card">
+        <span class="question-mark">?</span>
+        <div><p class="section-kicker">Вопрос интервьюера</p><blockquote>{{ recording.interview_question }}</blockquote>{% if recording.job_description %}<details><summary>Контекст вакансии <span>+</span></summary><p>{{ recording.job_description }}</p></details>{% endif %}</div>
+    </article>
+</section>
+
+<section id="analysis-workspace" class="analysis-workspace {% if recording.status in ['uploaded', 'transcribing', 'analyzing'] %}is-processing{% endif %} {% if analysis %}has-analysis{% endif %}">
+    <div class="workspace-heading"><div><p class="section-kicker">Персональный разбор</p><h2>Ваш ответ глазами интервьюера</h2></div><span class="ai-label">✦ Gemini AI</span></div>
+
+    <div class="analysis-skeleton" aria-label="AI-анализ загружается">
+        <div class="skeleton-card skeleton-score"><i></i><span></span><span></span></div>
+        <div class="skeleton-card"><span></span><span></span><span></span><span></span></div>
+        <div class="skeleton-card"><span></span><span></span><span></span></div>
+    </div>
+
+    <div id="analysis-empty" class="analysis-empty" {% if analysis or recording.status in ['uploaded', 'transcribing', 'analyzing'] %}hidden{% endif %}>
+        <span>✦</span>
+        {% if gemini_configured %}
+        <h3>AI-разбор пока недоступен</h3><p>Расшифровка сохранена. Попробуйте повторить обработку — Gemini мог быть временно недоступен.</p>
+        {% else %}
+        <h3>Расшифровка готова</h3><p>{% if request.app.state.desktop_mode %}Чтобы получить оценки и рекомендации, <a href="/settings">подключите Gemini в настройках</a> и повторите обработку.{% else %}Чтобы получить оценки и рекомендации, администратор должен настроить <code>GEMINI_API_KEY</code>.{% endif %}</p>
+        {% endif %}
+    </div>
+
+    <div id="analysis-content" class="analysis-content" {% if not analysis %}hidden{% endif %}>
+        <div class="score-overview">
+            <article class="overall-card">
+                <div class="overall-copy"><p>Общий балл</p><strong><span id="overall-score">{{ analysis.overall_score if analysis else '—' }}</span><small>/10</small></strong><em id="score-caption">Сильный ответ</em></div>
+                <div class="score-dial" id="score-dial" style="--score: {{ (analysis.overall_score * 10) if analysis else 0 }}%"><span>✦</span></div>
+            </article>
+            <div class="metric-cards">
+                {% for key, label, value in [('structure','Структура',analysis.structure_score if analysis else 0),('clarity','Ясность',analysis.clarity_score if analysis else 0),('specificity','Конкретика',analysis.specificity_score if analysis else 0)] %}
+                <article class="metric-card"><div><span>{{ label }}</span><strong id="{{ key }}-score">{{ value }}</strong></div><div class="metric-track"><i id="{{ key }}-bar" style="width: {{ value * 10 }}%"></i></div><small>{{ 'Логика и последовательность' if key == 'structure' else ('Простота формулировок' if key == 'clarity' else 'Факты, цифры, примеры') }}</small></article>
+                {% endfor %}
+            </div>
+        </div>
+
+        <article class="summary-card"><span class="spark-icon">✦</span><div><p class="section-kicker">Коротко о главном</p><h3 id="analysis-summary">{{ analysis.summary if analysis else '' }}</h3></div></article>
+
+        <div class="feedback-grid">
+            <article class="feedback-card strengths-card"><div class="feedback-heading"><span>↗</span><div><p>Сильные стороны</p><small>Что уже работает</small></div></div><ul id="strengths-list">{% if analysis %}{% for item in analysis.strengths %}<li>{{ item }}</li>{% endfor %}{% endif %}</ul></article>
+            <article class="feedback-card weaknesses-card"><div class="feedback-heading"><span>↘</span><div><p>Зоны роста</p><small>Что усилит ответ</small></div></div><ul id="weaknesses-list">{% if analysis %}{% for item in analysis.weaknesses %}<li>{{ item }}</li>{% endfor %}{% endif %}</ul></article>
+        </div>
+
+        <div class="detail-grid">
+            <article class="recommendations-card"><div class="card-section-heading"><div><span>03</span><p>Рекомендации</p></div><small>Практический план</small></div><ol id="recommendations-list">{% if analysis %}{% for item in analysis.recommendations %}<li><span>{{ '%02d' | format(loop.index) }}</span><p>{{ item }}</p></li>{% endfor %}{% endif %}</ol></article>
+            <article class="filler-card"><div class="card-section-heading"><div><span>⌁</span><p>Слова-паразиты</p></div></div><div id="filler-words" class="filler-words">{% if analysis and analysis.filler_words %}{% for item in analysis.filler_words %}<span>{{ item.word }} <b>×{{ item.count }}</b></span>{% endfor %}{% else %}<p class="no-fillers">Не обнаружены — отлично!</p>{% endif %}</div></article>
+        </div>
+
+        <article class="improved-card"><div class="improved-heading"><div><span class="spark-icon">✦</span><div><p class="section-kicker">Версия сильнее</p><h3>Как можно было ответить</h3></div></div><button id="copy-answer" class="copy-button" type="button">Копировать <span>⧉</span></button></div><p id="improved-answer">{{ analysis.improved_answer if analysis else '' }}</p></article>
+
+        <article class="follow-up-card"><span>→</span><div><p class="section-kicker">Будьте готовы продолжить</p><h3>Следующий вопрос интервьюера</h3><blockquote id="follow-up-question">{{ analysis.follow_up_question if analysis else '' }}</blockquote></div></article>
+    </div>
+</section>
+
+<section class="chat-section" aria-labelledby="chat-title">
+    <div class="chat-heading">
+        <div><p class="section-kicker">AI Chat</p><h2 id="chat-title">Разберите ответ глубже</h2></div>
+        <span>Gemini · контекст этой записи</span>
+    </div>
+    <div class="chat-shell" data-chat-configured="{{ 'true' if gemini_configured else 'false' }}">
+        <div id="chat-messages" class="chat-messages" aria-live="polite">
+            <article class="chat-message assistant"><span>AI</span><p>Спросите, почему получилась такая оценка, какую фразу усилить или как подготовиться к следующему вопросу.</p></article>
+        </div>
+        <form id="chat-form" class="chat-form">
+            <label class="sr-only" for="chat-question">Вопрос AI-тренеру</label>
+            <textarea id="chat-question" maxlength="2000" rows="2" placeholder="Например: почему оценка за конкретику только 6?" required></textarea>
+            <button class="button button-dark" type="submit">Спросить <span>↑</span></button>
+        </form>
+        <p id="chat-error" class="chat-error" role="alert" hidden></p>
+        {% if not gemini_configured %}<p class="chat-hint">Для AI Chat сначала <a href="/settings">подключите Gemini API key</a>.</p>{% endif %}
+    </div>
+</section>
+
+<section class="transcript-section">
+    <div class="transcript-heading"><div><p class="section-kicker">Расшифровка ответа</p><h2>Полный текст</h2></div><span>Whisper · RU</span></div>
+    <article class="transcript-card"><p id="transcript-text">{{ recording.transcript or 'Расшифровка ещё не готова.' }}</p></article>
+    <div class="result-actions"><a class="button button-dark" href="/record">Записать новый ответ <span>↗</span></a><a class="button button-light" href="/">Вернуться к записям</a></div>
+</section>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', path='/js/result.js') }}?v={{ app_version }}" defer></script>{% endblock %}
