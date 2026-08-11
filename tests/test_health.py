@@ -54,6 +54,15 @@ def test_main_page_is_available(client: TestClient) -> None:
     assert "Скачать приложение" in response.text
     assert "/download/macos" in response.text
     assert "/download/windows" in response.text
+    assert "Health-check" not in response.text
+
+
+def test_support_page_is_available(client: TestClient) -> None:
+    response = client.get("/support")
+
+    assert response.status_code == 200
+    assert "Где хранится мой Gemini API key?" in response.text
+    assert "Контакт можно добавить сюда." in response.text
 
 
 def test_macos_download_returns_built_package(

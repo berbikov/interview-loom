@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Поддержка — Interview Loom{% endblock %}
+
+{% block content %}
+<section class="support-page section-space">
+    <div class="support-heading"><p class="section-kicker">Поддержка</p><h1>Короткие ответы<br>на важные вопросы.</h1><p>Здесь собраны рабочие сценарии Interview Loom. Не отправляйте в поддержку API-ключ, видео или расшифровку.</p></div>
+    <div class="faq-list">
+        <details open><summary>Как работает Interview Loom?<span>+</span></summary><p>Вы записываете или загружаете тренировочный ответ. Приложение сохраняет видео, создаёт расшифровку и запускает AI-разбор текста, если подключён Gemini.</p></details>
+        <details><summary>Где хранится мой Gemini API key?<span>+</span></summary><p>В desktop-приложении ключ сохраняется в системном защищённом хранилище: Keychain на macOS или Credential Manager на Windows.</p></details>
+        <details><summary>Почему нужен собственный Gemini API key?<span>+</span></summary><p>Он подключает AI-разбор к вашему аккаунту Google AI Studio. Ключ можно добавить, проверить или удалить в настройках приложения.</p></details>
+        <details><summary>Какие видео поддерживаются?<span>+</span></summary><p>WebM, MP4, MOV и audio/webm. Лимит одной загрузки — до 500 МБ и до 60 минут.</p></details>
+        <details><summary>Что делать, если анализ не запустился?<span>+</span></summary><p>Проверьте Gemini API key и подключение к интернету, затем нажмите «Повторить AI-разбор». Если расшифровка уже готова, Whisper повторно не запускается.</p></details>
+        <details><summary>Как удалить запись?<span>+</span></summary><p>Удалите запись в её странице результата. Вместе с метаданными удаляется локально сохранённый медиафайл.</p></details>
+        <details><summary>Работает ли русский и английский язык?<span>+</span></summary><p>Да. Перед записью выберите Русский, English или автоматическое определение языка.</p></details>
+    </div>
+    <aside class="support-contact"><p class="section-kicker">Связь с разработчиком</p><h2>Контакт можно добавить сюда.</h2><p>Сейчас публичный канал связи не настроен. В этом блоке можно указать email, форму обратной связи или ссылку на репозиторий после их создания.</p></aside>
+</section>
+{% endblock %}

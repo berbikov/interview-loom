@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from scripts.build_landing import render, template_values
 from scripts.verify_landing import verify_landing
 
@@ -45,3 +47,13 @@ def test_landing_verifier_rejects_root_relative_asset(tmp_path) -> None:
 
     assert len(errors) == 1
     assert "GitHub Pages subpath" in errors[0]
+
+
+def test_landing_describes_existing_ai_chat_and_support() -> None:
+    template = (Path(__file__).parent.parent / "landing" / "index.template.html").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Диалог" in template
+    assert "В разработке" not in template
+    assert 'href="support.html"' in template

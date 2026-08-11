@@ -16,11 +16,11 @@
                 <span>Interview Loom</span>
             </a>
             <nav class="main-nav" aria-label="Основная навигация">
-                <a href="/#how-it-works">Как работает</a>
-                <a href="/#recent">Мои записи</a>
-                {% if request.app.state.desktop_mode %}<a href="/settings">Настройки</a>{% endif %}
-                {% if not request.app.state.desktop_mode %}<a href="/#download">Скачать</a>{% endif %}
-                <a class="nav-cta" href="/record">Новая запись <span>↗</span></a>
+                <a href="/#product">Продукт</a>
+                <a href="/#how-it-works">Как это работает</a>
+                <a href="/#about">О проекте</a>
+                <a href="/support">Поддержка</a>
+                <a class="nav-cta" href="/record">Новая тренировка <span>↗</span></a>
             </nav>
         </div>
     </header>
@@ -39,8 +39,8 @@
                 <p>Спокойная практика перед важным разговором.</p>
             </div>
             <div class="footer-links">
-                <div><span>Продукт</span><a href="/record">Записать ответ</a><a href="/#how-it-works">Как работает</a>{% if not request.app.state.desktop_mode %}<a href="/#download">Скачать приложение</a>{% endif %}</div>
-                <div><span>Разработка</span><a href="/docs">API</a><a href="/health">Health-check</a>{% if request.app.state.desktop_mode %}<a href="/settings">Настройки</a>{% endif %}</div>
+                <div><span>Продукт</span><a href="/record">Новая тренировка</a><a href="/#how-it-works">Как работает</a><a href="/#about">О проекте</a></div>
+                <div><span>Помощь</span><a href="/support">Поддержка</a>{% if request.app.state.desktop_mode %}<a href="/settings">Настройки Gemini</a>{% endif %}{% if not request.app.state.desktop_mode %}<a href="/#download">Скачать приложение</a>{% endif %}</div>
             </div>
             <p class="footer-note">Для тренировки и анализа после ответа. Не предназначено для скрытых подсказок во время реального интервью.</p>
         </div>

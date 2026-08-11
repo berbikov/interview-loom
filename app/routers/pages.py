@@ -79,6 +79,11 @@ def settings_page(
     )
 
 
+@router.get("/support", response_class=HTMLResponse)
+def support_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="support.html")
+
+
 @router.get("/download/macos", response_class=FileResponse, response_model=None)
 def download_macos_app(request: Request) -> Response:
     if not MACOS_PACKAGE_PATH.is_file():
