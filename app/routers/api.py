@@ -105,14 +105,22 @@ def get_gemini_settings(
 def update_gemini_settings(
     payload: GeminiSettingsUpdate,
     secret_store: Annotated[SecretStoreProtocol, Depends(get_secret_store)],
+    analysis_service: Annotated[AnalysisServiceProtocol, Depends(get_analysis_service)],
 ) -> GeminiSettingsResponse:
     if not secret_store.is_editable:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="В веб-режиме ключ настраивается на сервере.",
         )
+    api_key = payload.api_key.get_secret_value()
     try:
-        secret_store.set_gemini_api_key(payload.api_key.get_secret_value())
+        analysis_service.validate_api_key(api_key)
+        secret_store.set_gemini_api_key(api_key)
+    except GeminiConfigurationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
     except SecretStoreError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

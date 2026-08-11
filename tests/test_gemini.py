@@ -26,6 +26,10 @@ ANALYSIS_REQUEST = AnalysisRequest(
 class StubGeminiClient:
     def __init__(self) -> None:
         self.requests: list[AnalysisRequest] = []
+        self.validation_calls = 0
+
+    def validate_access(self) -> None:
+        self.validation_calls += 1
 
     def generate_analysis(self, request: AnalysisRequest) -> AIAnalysis:
         self.requests.append(request)
@@ -96,6 +100,19 @@ def test_gemini_service_uses_key_and_returns_validated_analysis(tmp_path: Path) 
     assert client.requests == [ANALYSIS_REQUEST]
 
 
+def test_gemini_key_is_validated_without_generating_content(tmp_path: Path) -> None:
+    client = StubGeminiClient()
+    service = GeminiAnalysisService(
+        settings=(settings := build_settings(tmp_path, None)),
+        secret_store=EnvironmentSecretStore(settings),
+        client_factory=lambda api_key, configured_settings: client,
+    )
+
+    service.validate_api_key(" user-owned-key ")
+
+    assert client.validation_calls == 1
+
+
 class StubSDKResponse:
     def __init__(self, parsed: AIAnalysis) -> None:
         self.parsed = parsed
@@ -117,6 +134,10 @@ class StubSDKModels:
         assert "Product Manager" in contents
         assert config.response_mime_type == "application/json"
         return self.response
+
+    def get(self, *, model: str) -> object:
+        self.model_names.append(model)
+        return object()
 
 
 class StubSDKClient:
@@ -159,4 +180,22 @@ def test_google_sdk_adapter_uses_structured_response_without_network(
 
     assert result == expected
     assert received_keys == ["test-secret"]
+    assert sdk_client.models.model_names == ["gemini-2.5-flash"]
+
+
+def test_google_sdk_validates_key_by_reading_model_without_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = StubGeminiClient().generate_analysis(ANALYSIS_REQUEST)
+    sdk_client = StubSDKClient(StubSDKResponse(expected))
+
+    monkeypatch.setattr(
+        "app.services.gemini.genai.Client",
+        lambda **_: sdk_client,
+    )
+    client = GoogleGeminiClient("test-secret", build_settings(tmp_path, None))
+
+    client.validate_access()
+
     assert sdk_client.models.model_names == ["gemini-2.5-flash"]

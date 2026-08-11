@@ -46,6 +46,8 @@ class InterviewChatRequest:
 
 
 class GeminiClient(Protocol):
+    def validate_access(self) -> None: ...
+
     def generate_analysis(self, request: AnalysisRequest) -> AIAnalysis: ...
 
     def generate_chat_reply(self, request: InterviewChatRequest) -> str: ...
@@ -62,9 +64,8 @@ class GoogleGeminiClient:
         self.api_key = api_key
         self.settings = settings
 
-    def generate_analysis(self, request: AnalysisRequest) -> AIAnalysis:
-        prompt = self._build_prompt(request)
-        http_options = types.HttpOptions(
+    def _http_options(self) -> types.HttpOptions:
+        return types.HttpOptions(
             timeout=self.settings.gemini_timeout_seconds * 1000,
             retry_options=types.HttpRetryOptions(
                 attempts=self.settings.gemini_retry_attempts,
@@ -75,8 +76,45 @@ class GoogleGeminiClient:
             ),
         )
 
+    def validate_access(self) -> None:
+        """Verify the key and configured model without generating any content."""
         try:
-            with genai.Client(api_key=self.api_key, http_options=http_options) as client:
+            with genai.Client(api_key=self.api_key, http_options=self._http_options()) as client:
+                client.models.get(model=self.settings.gemini_model)
+        except errors.APIError as error:
+            logger.warning(
+                "Gemini key validation failed: model=%s code=%s",
+                self.settings.gemini_model,
+                error.code,
+            )
+            message = str(error).lower()
+            if "location" in message or "region" in message:
+                detail = (
+                    "Gemini API недоступен из текущего региона. "
+                    "Проверьте доступность сервиса Google для вашей страны."
+                )
+            elif error.code in {400, 401, 403}:
+                detail = (
+                    "Gemini не принял API-ключ. Создайте новый ключ в Google AI Studio "
+                    "и убедитесь, что Gemini API включён."
+                )
+            elif error.code == 404:
+                detail = "Выбранная модель Gemini недоступна для этого API-ключа."
+            elif error.code == 429:
+                detail = "Квота Gemini исчерпана. Проверьте лимиты проекта Google AI Studio."
+            else:
+                detail = "Не удалось проверить API-ключ Gemini. Попробуйте позже."
+            raise GeminiConfigurationError(detail) from error
+        except Exception as error:
+            logger.exception("Unexpected Gemini key validation error")
+            raise GeminiConfigurationError(
+                "Не удалось связаться с Gemini для проверки ключа. Проверьте интернет-соединение."
+            ) from error
+
+    def generate_analysis(self, request: AnalysisRequest) -> AIAnalysis:
+        prompt = self._build_prompt(request)
+        try:
+            with genai.Client(api_key=self.api_key, http_options=self._http_options()) as client:
                 response = client.models.generate_content(
                     model=self.settings.gemini_model,
                     contents=prompt,
@@ -149,18 +187,8 @@ AI-РАЗБОР — КОНЕЦ
 Дай короткий практический ответ. Когда предлагаешь улучшение, приведи пример
 формулировки, которую кандидат может использовать.
 """.strip()
-        http_options = types.HttpOptions(
-            timeout=self.settings.gemini_timeout_seconds * 1000,
-            retry_options=types.HttpRetryOptions(
-                attempts=self.settings.gemini_retry_attempts,
-                initial_delay=1.0,
-                max_delay=8.0,
-                exp_base=2.0,
-                jitter=0.5,
-            ),
-        )
         try:
-            with genai.Client(api_key=self.api_key, http_options=http_options) as client:
+            with genai.Client(api_key=self.api_key, http_options=self._http_options()) as client:
                 response = client.models.generate_content(
                     model=self.settings.gemini_model,
                     contents=prompt,
@@ -246,6 +274,12 @@ class GeminiAnalysisService:
         client = self.client_factory(api_key, self.settings)
         return client.generate_analysis(request)
 
+    def validate_api_key(self, api_key: str) -> None:
+        normalized = api_key.strip()
+        if not normalized:
+            raise GeminiConfigurationError("API-ключ не может быть пустым.")
+        self.client_factory(normalized, self.settings).validate_access()
+
     def chat(self, request: InterviewChatRequest) -> str:
         try:
             api_key = self.secret_store.get_gemini_api_key()
@@ -264,5 +298,7 @@ class AnalysisServiceProtocol(Protocol):
     def is_configured(self) -> bool: ...
 
     def analyze(self, request: AnalysisRequest) -> AIAnalysis: ...
+
+    def validate_api_key(self, api_key: str) -> None: ...
 
     def chat(self, request: InterviewChatRequest) -> str: ...

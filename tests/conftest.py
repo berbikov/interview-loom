@@ -7,7 +7,11 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import create_app
 from app.schemas import AIAnalysis
-from app.services.gemini import AnalysisRequest, InterviewChatRequest
+from app.services.gemini import (
+    AnalysisRequest,
+    GeminiConfigurationError,
+    InterviewChatRequest,
+)
 from app.services.secret_store import SecretStoreProtocol
 from app.services.transcription import TranscriptionResult
 
@@ -51,6 +55,10 @@ class StubAnalysisService:
 
     def chat(self, request: InterviewChatRequest) -> str:
         return f"Оценка опирается на расшифровку. Ваш вопрос: {request.question}"
+
+    def validate_api_key(self, api_key: str) -> None:
+        if api_key == "invalid-test-key":
+            raise GeminiConfigurationError("Gemini не принял API-ключ.")
 
 
 class StubSecretStore:

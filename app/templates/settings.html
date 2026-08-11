@@ -26,14 +26,15 @@
             </div>
             <p class="field-hint">Существующий ключ никогда не отображается и не возвращается через API.</p>
             <div class="settings-actions">
-                <button id="save-gemini-key" class="button button-dark" type="submit">Сохранить ключ</button>
+                <button id="save-gemini-key" class="button button-dark" type="submit">Проверить и сохранить</button>
                 <button id="delete-gemini-key" class="button button-light" type="button" {% if not gemini_configured %}disabled{% endif %}>Удалить ключ</button>
             </div>
+            <p class="field-hint">Нет ключа? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Получить в Google AI Studio ↗</a></p>
         </form>
         {% else %}
         <div class="server-settings-note"><p>В серверном режиме ключ задаётся администратором через переменную окружения <code>GEMINI_API_KEY</code>.</p></div>
         {% endif %}
-        <p id="settings-message" class="status-message {{ 'error' if settings_error else '' }}" role="status">{{ settings_error or ('Ключ сохранён. Его доступность проверится при следующем анализе.' if gemini_configured else 'Добавьте ключ, чтобы получать оценки и рекомендации.') }}</p>
+        <p id="settings-message" class="status-message {{ 'error' if settings_error else '' }}" role="status">{{ settings_error or ('Ключ проверен и сохранён.' if gemini_configured else 'Добавьте собственный ключ, чтобы получать оценки и рекомендации.') }}</p>
     </article>
 
     <article class="privacy-settings-card">

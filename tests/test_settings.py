@@ -35,6 +35,20 @@ def test_gemini_key_can_be_deleted(
     assert secret_store.api_key is None
 
 
+def test_invalid_gemini_key_is_not_saved(
+    client: TestClient,
+    secret_store: StubSecretStore,
+) -> None:
+    response = client.put(
+        "/api/settings/gemini",
+        json={"api_key": "invalid-test-key"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Gemini не принял API-ключ."
+    assert secret_store.api_key is None
+
+
 def test_settings_page_never_contains_saved_key(
     client: TestClient,
     secret_store: StubSecretStore,

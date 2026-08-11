@@ -31,7 +31,7 @@ if (settingsForm) {
             return;
         }
         saveButton.disabled = true;
-        showMessage("Сохраняем ключ в системном хранилище…");
+        showMessage("Проверяем доступ к Gemini…");
         try {
             const response = await fetch("/api/settings/gemini", {
                 method: "PUT",
@@ -46,7 +46,7 @@ if (settingsForm) {
             keyInput.type = "password";
             visibilityButton.textContent = "Показать";
             renderConfigured(payload.configured);
-            showMessage("Ключ сохранён. Теперь можно повторить AI-анализ записи.");
+            showMessage("Ключ проверен и сохранён. Теперь можно повторить AI-анализ записи.");
         } catch (error) {
             showMessage(error instanceof Error ? error.message : "Не удалось сохранить ключ.", true);
         } finally {
