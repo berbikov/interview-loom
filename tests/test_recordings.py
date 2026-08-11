@@ -256,6 +256,31 @@ def test_ai_chat_uses_recording_context_and_persists_history(
     ]
 
 
+def test_training_flow_automatically_analyzes_and_continues_in_chat(
+    client: TestClient,
+    transcription_service: StubTranscriptionService,
+    analysis_service: StubAnalysisService,
+) -> None:
+    """The critical happy path must not require a second Whisper or Gemini request."""
+    created = create_test_recording(client)
+    public_id = str(created["public_id"])
+
+    result = client.get(f"/api/recordings/{public_id}")
+    chat = client.post(
+        f"/api/recordings/{public_id}/chat",
+        json={"question": "Как мне сделать ответ конкретнее?"},
+    )
+
+    assert result.status_code == 200
+    assert result.json()["status"] == "completed"
+    assert result.json()["transcript"] == "Это тестовая расшифровка интервью."
+    assert result.json()["analysis_json"] is not None
+    assert len(transcription_service.processed_paths) == 1
+    assert len(analysis_service.requests) == 1
+    assert chat.status_code == 200
+    assert "Как мне сделать ответ конкретнее?" in chat.json()["content"]
+
+
 def test_ai_chat_rejects_empty_question(client: TestClient) -> None:
     created = create_test_recording(client)
     response = client.post(

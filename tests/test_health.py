@@ -55,6 +55,10 @@ def test_main_page_is_available(client: TestClient) -> None:
     assert "/download/macos" in response.text
     assert "/download/windows" in response.text
     assert "Health-check" not in response.text
+    assert ">API<" not in response.text
+    assert "Разработка" not in response.text
+    for label in ("Продукт", "Как это работает", "О проекте", "Поддержка", "Новая тренировка"):
+        assert label in response.text
 
 
 def test_support_page_is_available(client: TestClient) -> None:
