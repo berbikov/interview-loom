@@ -75,7 +75,7 @@ jobs:
         run: shasum -a 256 release/Interview-Loom-macOS-arm64.* > release/Interview-Loom-macOS-arm64.sha256
       - name: Generate macOS release manifest
         run: python scripts/create_release_manifest.py --platform macOS --architecture arm64 --output release/Interview-Loom-macOS-arm64.manifest.json release/Interview-Loom-macOS-arm64.zip release/Interview-Loom-macOS-arm64.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-arm64
           path: release/Interview-Loom-macOS-arm64.*
@@ -129,7 +129,7 @@ jobs:
       - name: Generate Windows release manifest
         shell: pwsh
         run: python scripts\create_release_manifest.py --platform Windows --architecture x64 --output release\Interview-Loom-Windows-x64.manifest.json release\Interview-Loom-Setup-x64.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-x64
           path: |
