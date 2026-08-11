@@ -15,6 +15,26 @@ def test_health_check(client: TestClient) -> None:
     assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
 
 
+def test_web_content_security_policy_disallows_eval(client: TestClient) -> None:
+    response = client.get("/")
+
+    assert "script-src 'self';" in response.headers["content-security-policy"]
+    assert "'unsafe-eval'" not in response.headers["content-security-policy"]
+
+
+def test_desktop_content_security_policy_allows_pywebview_bridge(
+    client: TestClient,
+) -> None:
+    client.app.state.desktop_mode = True
+
+    response = client.get("/")
+
+    assert (
+        "script-src 'self' 'unsafe-eval';"
+        in response.headers["content-security-policy"]
+    )
+
+
 def test_cross_origin_mutation_is_rejected(client: TestClient) -> None:
     response = client.put(
         "/api/settings/gemini",

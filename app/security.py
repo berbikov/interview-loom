@@ -41,9 +41,11 @@ async def security_middleware(
     response.headers["Permissions-Policy"] = (
         "camera=(self), microphone=(self), display-capture=(self)"
     )
+    desktop_mode = bool(getattr(request.app.state, "desktop_mode", False))
+    script_sources = "'self' 'unsafe-eval'" if desktop_mode else "'self'"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self'; "
+        f"script-src {script_sources}; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: blob:; "
         "media-src 'self' blob:; "

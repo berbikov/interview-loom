@@ -36,6 +36,7 @@ let durationSeconds = 0;
 let usedCameraFallback = false;
 let uploadedFile = null;
 let activeSource = "record";
+let desktopBridgeReady = false;
 
 const supportedUploadTypes = new Set([
     "video/webm",
@@ -61,9 +62,12 @@ function supportsMediaRecording() {
 }
 
 async function openSystemBrowserForRecording() {
-    const desktopApi = window.pywebview?.api;
+    const desktopApi = await waitForDesktopApi();
     if (!desktopApi?.open_recording_in_browser) {
-        setStatus("Этот браузер не поддерживает запись медиа.", true);
+        setStatus(
+            "Встроенное окно не поддерживает запись. Откройте студию в Safari, Chrome или Edge.",
+            true
+        );
         return;
     }
     try {
@@ -75,6 +79,21 @@ async function openSystemBrowserForRecording() {
         console.error("Could not open recording studio in system browser", error);
         setStatus("Не удалось открыть системный браузер.", true);
     }
+}
+
+function waitForDesktopApi(timeoutMilliseconds = 2500) {
+    if (window.pywebview?.api) {
+        return Promise.resolve(window.pywebview.api);
+    }
+    return new Promise((resolve) => {
+        const deadline = Date.now() + timeoutMilliseconds;
+        const timerId = window.setInterval(() => {
+            if (window.pywebview?.api || Date.now() >= deadline) {
+                window.clearInterval(timerId);
+                resolve(window.pywebview?.api || null);
+            }
+        }, 50);
+    });
 }
 
 async function reportDesktopMediaCapabilities() {
@@ -508,6 +527,10 @@ window.addEventListener("beforeunload", () => {
 });
 
 function initializeDesktopMediaBridge() {
+    if (desktopBridgeReady) {
+        return;
+    }
+    desktopBridgeReady = true;
     reportDesktopMediaCapabilities();
     if (!supportsMediaRecording() && window.pywebview?.api?.open_recording_in_browser) {
         startButton.textContent = "Открыть запись в браузере";
@@ -521,4 +544,9 @@ if (window.pywebview?.api) {
     initializeDesktopMediaBridge();
 } else {
     window.addEventListener("pywebviewready", initializeDesktopMediaBridge, { once: true });
+    waitForDesktopApi().then((desktopApi) => {
+        if (desktopApi) {
+            initializeDesktopMediaBridge();
+        }
+    });
 }
