@@ -21,7 +21,7 @@ def configure_macos_media_permissions() -> None:
     if sys.platform != "darwin":
         return
 
-    import WebKit  # type: ignore[import-untyped]
+    import WebKit
     from webview.platforms.cocoa import BrowserView
 
     original_delegate = BrowserView.BrowserDelegate

@@ -18,5 +18,14 @@ show_error_codes = true
 exclude = ["migrations/"]
 
 [[tool.mypy.overrides]]
-module = ["faster_whisper", "faster_whisper.*", "webview", "keyring", "keyring.*"]
+module = [
+    "faster_whisper",
+    "faster_whisper.*",
+    "keyring",
+    "keyring.*",
+    "PIL",
+    "PIL.*",
+    "WebKit",
+    "webview",
+]
 ignore_missing_imports = true
