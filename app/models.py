@@ -45,7 +45,10 @@ class InterviewRecording(Base):
     job_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     video_filename: Mapped[str] = mapped_column(String(255), unique=True)
     video_mime_type: Mapped[str] = mapped_column(String(100))
+    transcription_language: Mapped[str] = mapped_column(String(10), default="ru")
     duration_seconds: Mapped[float] = mapped_column(Float)
+    raw_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    clean_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
     transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
     analysis_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(

@@ -8,13 +8,13 @@
         <a class="back-link" href="/">← На главную</a>
         <p class="section-kicker">Персональные настройки</p>
         <h1>Подключите<br><em>свой Gemini.</em></h1>
-        <p>Ключ нужен только для AI-разбора текста. Видео в Gemini не отправляется.</p>
+        <p>Для AI-анализа Interview Loom использует Google Gemini API. Получите личный API-ключ в Google AI Studio и вставьте его сюда.</p>
     </div>
 
     <article class="settings-card">
         <div class="settings-card-heading">
             <div><span class="settings-icon">✦</span><div><h2>Gemini API key</h2><p>Хранится в системном защищённом хранилище.</p></div></div>
-            <span id="gemini-key-status" class="key-status {{ 'configured' if gemini_configured else '' }}">{{ 'Сохранён' if gemini_configured else 'Не добавлен' }}</span>
+            <span id="gemini-key-status" class="key-status {{ 'configured' if gemini_configured else '' }}">{{ 'Gemini подключён' if gemini_configured else 'Gemini не подключён' }}</span>
         </div>
 
         {% if settings_editable %}
@@ -26,15 +26,16 @@
             </div>
             <p class="field-hint">Существующий ключ никогда не отображается и не возвращается через API.</p>
             <div class="settings-actions">
-                <button id="save-gemini-key" class="button button-dark" type="submit">Проверить и сохранить</button>
+                <button id="validate-gemini-key" class="button button-light" type="button">Проверить подключение</button>
+                <button id="save-gemini-key" class="button button-dark" type="submit">Сохранить ключ</button>
                 <button id="delete-gemini-key" class="button button-light" type="button" {% if not gemini_configured %}disabled{% endif %}>Удалить ключ</button>
             </div>
-            <p class="field-hint">Нет ключа? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Получить в Google AI Studio ↗</a></p>
+            <p class="field-hint">Нет ключа? <a id="get-gemini-key-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Получить Gemini API key ↗</a></p>
         </form>
         {% else %}
         <div class="server-settings-note"><p>В серверном режиме ключ задаётся администратором через переменную окружения <code>GEMINI_API_KEY</code>.</p></div>
         {% endif %}
-        <p id="settings-message" class="status-message {{ 'error' if settings_error else '' }}" role="status">{{ settings_error or ('Ключ проверен и сохранён.' if gemini_configured else 'Добавьте собственный ключ, чтобы получать оценки и рекомендации.') }}</p>
+        <p id="settings-message" class="status-message {{ 'error' if settings_error else '' }}" role="status">{{ settings_error or ('Gemini подключён.' if gemini_configured else 'Добавьте собственный ключ, чтобы получать оценки и рекомендации.') }}</p>
     </article>
 
     <article class="privacy-settings-card">

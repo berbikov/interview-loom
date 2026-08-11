@@ -37,13 +37,17 @@ class RecordingProcessor:
         self.analysis_service = analysis_service
 
     def process(self, public_id: str) -> None:
-        video_filename = self._mark_transcribing(public_id)
-        if video_filename is None:
+        recording_data = self._mark_transcribing(public_id)
+        if recording_data is None:
             return
+        video_filename, transcription_language = recording_data
 
         media_path = self.settings.upload_dir / Path(video_filename).name
         try:
-            transcription = self.transcription_service.transcribe(media_path)
+            transcription = self.transcription_service.transcribe(
+                media_path,
+                language=transcription_language,
+            )
         except TranscriptionError as error:
             self._mark_failed(public_id, str(error))
             return
@@ -54,18 +58,33 @@ class RecordingProcessor:
 
         analysis_request = self._save_transcript(
             public_id=public_id,
-            transcript=transcription.text,
+            raw_transcript=transcription.raw_text or transcription.text,
+            clean_transcript=transcription.clean_text,
             duration_seconds=transcription.duration_seconds,
         )
         if analysis_request is None:
             return
 
+        self._run_analysis(public_id, analysis_request, transcription.detected_language)
+
+    def analyze_saved_transcript(self, public_id: str) -> None:
+        analysis_request = self._mark_analyzing_from_saved_transcript(public_id)
+        if analysis_request is None:
+            return
+        self._run_analysis(public_id, analysis_request)
+
+    def _run_analysis(
+        self,
+        public_id: str,
+        analysis_request: AnalysisRequest,
+        detected_language: str | None = None,
+    ) -> None:
         if not self.analysis_service.is_configured:
             self._mark_completed_without_analysis(public_id)
             logger.info(
                 "Transcription completed without Gemini configuration: public_id=%s language=%s",
                 public_id,
-                transcription.detected_language,
+                detected_language or "saved",
             )
             return
 
@@ -113,7 +132,7 @@ class RecordingProcessor:
             logger.exception("Could not recover interrupted recordings")
             return 0
 
-    def _mark_transcribing(self, public_id: str) -> str | None:
+    def _mark_transcribing(self, public_id: str) -> tuple[str, str] | None:
         try:
             with self.database.session() as session:
                 recording = session.scalar(
@@ -126,7 +145,7 @@ class RecordingProcessor:
                 recording.analysis_json = None
                 recording.error_message = None
                 session.commit()
-                return recording.video_filename
+                return recording.video_filename, recording.transcription_language
         except SQLAlchemyError:
             logger.exception("Could not start transcription: public_id=%s", public_id)
             return None
@@ -134,7 +153,8 @@ class RecordingProcessor:
     def _save_transcript(
         self,
         public_id: str,
-        transcript: str,
+        raw_transcript: str,
+        clean_transcript: str,
         duration_seconds: float,
     ) -> AnalysisRequest | None:
         try:
@@ -144,13 +164,15 @@ class RecordingProcessor:
                 )
                 if recording is None:
                     return None
-                recording.transcript = transcript
+                recording.raw_transcript = raw_transcript
+                recording.clean_transcript = clean_transcript
+                recording.transcript = clean_transcript
                 if duration_seconds > 0:
                     recording.duration_seconds = duration_seconds
                 recording.status = RecordingStatus.ANALYZING.value
                 recording.error_message = None
                 request = AnalysisRequest(
-                    transcript=transcript,
+                    transcript=clean_transcript,
                     role=recording.role,
                     interview_question=recording.interview_question,
                     job_description=recording.job_description,
@@ -160,6 +182,36 @@ class RecordingProcessor:
         except SQLAlchemyError:
             logger.exception("Could not save transcript: public_id=%s", public_id)
             self._mark_failed(public_id, "Расшифровка создана, но её не удалось сохранить.")
+            return None
+
+    def _mark_analyzing_from_saved_transcript(
+        self,
+        public_id: str,
+    ) -> AnalysisRequest | None:
+        try:
+            with self.database.session() as session:
+                recording = session.scalar(
+                    select(InterviewRecording).where(InterviewRecording.public_id == public_id)
+                )
+                if recording is None or not recording.transcript:
+                    return None
+                recording.status = RecordingStatus.ANALYZING.value
+                recording.analysis_json = None
+                recording.error_message = None
+                request = AnalysisRequest(
+                    transcript=recording.transcript,
+                    role=recording.role,
+                    interview_question=recording.interview_question,
+                    job_description=recording.job_description,
+                )
+                session.commit()
+                return request
+        except SQLAlchemyError:
+            logger.exception("Could not start saved transcript analysis: public_id=%s", public_id)
+            self._mark_completed_without_analysis(
+                public_id,
+                "Не удалось повторно запустить AI-анализ.",
+            )
             return None
 
     def _save_analysis(self, public_id: str, analysis_json: str) -> None:

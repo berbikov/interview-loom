@@ -20,7 +20,11 @@ class StubTranscriptionService:
     def __init__(self) -> None:
         self.processed_paths: list[Path] = []
 
-    def transcribe(self, media_path: Path) -> TranscriptionResult:
+    def transcribe(
+        self,
+        media_path: Path,
+        language: str | None = None,
+    ) -> TranscriptionResult:
         self.processed_paths.append(media_path)
         return TranscriptionResult(
             text="Это тестовая расшифровка интервью.",

@@ -17,7 +17,7 @@ def test_landing_template_values_use_repository_release(
     assert "{{" not in rendered
     assert "https://interview.example" in rendered
     assert "github.com/example/interview-loom/releases/latest/download" in rendered
-    assert "Interview-Loom-macOS-arm64.zip" in rendered
+    assert "Interview-Loom-macOS-arm64.dmg" in rendered
     assert "Interview-Loom-Setup-x64.exe" in rendered
 
 

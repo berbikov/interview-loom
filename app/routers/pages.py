@@ -50,7 +50,10 @@ def record_page(
     return templates.TemplateResponse(
         request=request,
         name="record.html",
-        context={"max_upload_size_bytes": settings.max_upload_size_bytes},
+        context={
+            "max_upload_size_bytes": settings.max_upload_size_bytes,
+            "max_video_duration_seconds": settings.max_video_duration_seconds,
+        },
     )
 
 

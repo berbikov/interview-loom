@@ -38,7 +38,10 @@ class RecordingResponse(BaseModel):
     job_description: str | None
     video_filename: str
     video_mime_type: str
+    transcription_language: str
     duration_seconds: float
+    raw_transcript: str | None
+    clean_transcript: str | None
     transcript: str | None
     analysis_json: str | None
     status: RecordingStatus

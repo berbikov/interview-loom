@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from google.genai import types
+from google.genai import errors, types
 
 from app.config import Settings
 from app.schemas import AIAnalysis
@@ -12,6 +12,7 @@ from app.services.gemini import (
     GeminiConfigurationError,
     GoogleGeminiClient,
     InterviewChatRequest,
+    user_message_for_gemini_error,
 )
 from app.services.secret_store import EnvironmentSecretStore
 
@@ -131,8 +132,10 @@ class StubSDKModels:
         config: types.GenerateContentConfig,
     ) -> StubSDKResponse:
         self.model_names.append(model)
-        assert "Product Manager" in contents
-        assert config.response_mime_type == "application/json"
+        if "Product Manager" in contents:
+            assert config.response_mime_type == "application/json"
+        else:
+            assert contents == "Reply with OK."
         return self.response
 
     def get(self, *, model: str) -> object:
@@ -180,10 +183,10 @@ def test_google_sdk_adapter_uses_structured_response_without_network(
 
     assert result == expected
     assert received_keys == ["test-secret"]
-    assert sdk_client.models.model_names == ["gemini-2.5-flash"]
+    assert sdk_client.models.model_names == ["gemini-3.6-flash"]
 
 
-def test_google_sdk_validates_key_by_reading_model_without_generation(
+def test_google_sdk_validates_key_with_minimal_generation_request(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -198,4 +201,32 @@ def test_google_sdk_validates_key_by_reading_model_without_generation(
 
     client.validate_access()
 
-    assert sdk_client.models.model_names == ["gemini-2.5-flash"]
+    assert sdk_client.models.model_names == ["gemini-3.6-flash"]
+
+
+@pytest.mark.parametrize(
+    ("code", "message", "expected"),
+    [
+        (401, "API key not valid", "не принял API-ключ"),
+        (403, "permission denied", "недостаточно прав"),
+        (404, "not found", "модель Gemini или API endpoint"),
+        (429, "quota exhausted", "Квота Gemini"),
+        (400, "free tier is not supported in your country", "биллинга"),
+    ],
+)
+def test_gemini_api_errors_have_actionable_safe_messages(
+    code: int,
+    message: str,
+    expected: str,
+) -> None:
+    error = errors.ClientError(code, {"error": {"message": message}})
+
+    assert expected in user_message_for_gemini_error(error)
+
+
+def test_gemini_offline_error_has_no_provider_detail() -> None:
+    import httpx
+
+    message = user_message_for_gemini_error(httpx.ConnectError("offline"))
+
+    assert message == "Нет соединения с Gemini. Проверьте интернет и повторите попытку."

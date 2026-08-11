@@ -43,6 +43,15 @@
             </label>
 
             <fieldset class="mode-fieldset">
+                <legend>Язык интервью</legend>
+                <div class="mode-grid language-grid">
+                    <label class="mode-option"><input type="radio" name="transcription_language" value="ru" checked><span><strong>Русский</strong><small>Точная русская расшифровка</small></span><i>✓</i></label>
+                    <label class="mode-option"><input type="radio" name="transcription_language" value="en"><span><strong>English</strong><small>English transcription</small></span><i>✓</i></label>
+                    <label class="mode-option"><input type="radio" name="transcription_language" value="auto"><span><strong>Авто</strong><small>Определить язык записи</small></span><i>✓</i></label>
+                </div>
+            </fieldset>
+
+            <fieldset class="mode-fieldset">
                 <legend>Что записываем</legend>
                 <div class="mode-grid">
                     <label class="mode-option">
@@ -72,6 +81,7 @@
             id="file-upload-panel"
             class="file-upload-panel"
             data-max-size="{{ max_upload_size_bytes }}"
+            data-max-duration="{{ max_video_duration_seconds }}"
             hidden
         >
             <input id="video-file-input" type="file" accept="video/webm,video/mp4,video/quicktime,audio/webm" hidden>
@@ -79,7 +89,7 @@
                 <span class="file-upload-icon">↓</span>
                 <strong>Перетащите готовое видео</strong>
                 <small>или нажмите, чтобы выбрать WebM, MP4 или MOV</small>
-                <em>До {{ (max_upload_size_bytes / 1024 / 1024) | int }} МБ</em>
+                <em>До {{ (max_upload_size_bytes / 1024 / 1024) | int }} МБ · до {{ (max_video_duration_seconds / 60) | int }} минут</em>
             </button>
         </section>
         <div id="recording-panel">

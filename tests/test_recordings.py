@@ -41,6 +41,7 @@ def test_create_recording(client: TestClient) -> None:
     assert payload["duration_seconds"] == 42.5
     assert payload["transcript"] is None
     assert payload["analysis_json"] is None
+    assert payload["transcription_language"] == "ru"
     assert payload["public_id"]
 
 
@@ -66,6 +67,17 @@ def test_rejects_file_over_maximum_size(client: TestClient) -> None:
     assert "Размер видео" in response.json()["detail"]
 
 
+def test_rejects_video_longer_than_configured_limit(client: TestClient) -> None:
+    response = client.post(
+        "/api/recordings",
+        data={**RECORDING_FORM, "duration_seconds": "3601"},
+        files={"video": ("interview.webm", b"\x1a\x45\xdf\xa3valid-video", "video/webm")},
+    )
+
+    assert response.status_code == 413
+    assert "60 минут" in response.json()["detail"]
+
+
 def test_rejects_mismatched_media_container(client: TestClient) -> None:
     response = client.post(
         "/api/recordings",
@@ -88,6 +100,8 @@ def test_get_recording_by_public_id(client: TestClient) -> None:
     assert response.json()["interview_question"] == RECORDING_FORM["interview_question"]
     assert response.json()["status"] == "completed"
     assert response.json()["transcript"] == "Это тестовая расшифровка интервью."
+    assert response.json()["raw_transcript"] == "Это тестовая расшифровка интервью."
+    assert response.json()["clean_transcript"] == "Это тестовая расшифровка интервью."
     assert '"overall_score":8' in response.json()["analysis_json"]
 
 
@@ -108,6 +122,17 @@ def test_automatic_transcription_runs_after_upload(
     assert analysis_service.requests[0].role == RECORDING_FORM["role"]
 
 
+def test_recording_saves_selected_transcription_language(client: TestClient) -> None:
+    response = client.post(
+        "/api/recordings",
+        data={**RECORDING_FORM, "transcription_language": "en"},
+        files={"video": ("interview.webm", b"\x1a\x45\xdf\xa3valid-video", "video/webm")},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["transcription_language"] == "en"
+
+
 def test_restart_recording_analysis(
     client: TestClient,
     transcription_service: StubTranscriptionService,
@@ -120,14 +145,18 @@ def test_restart_recording_analysis(
     refreshed = client.get(f"/api/recordings/{public_id}")
 
     assert response.status_code == 202
-    assert response.json()["status"] == "uploaded"
+    assert response.json()["status"] == "analyzing"
     assert refreshed.json()["status"] == "completed"
-    assert len(transcription_service.processed_paths) == 2
+    assert len(transcription_service.processed_paths) == 1
     assert len(analysis_service.requests) == 2
 
 
 class FailingTranscriptionService:
-    def transcribe(self, media_path: Path) -> TranscriptionResult:
+    def transcribe(
+        self,
+        media_path: Path,
+        language: str | None = None,
+    ) -> TranscriptionResult:
         raise TranscriptionError("Тестовая ошибка транскрибации.")
 
 

@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Protocol
 
+import httpx
 from google import genai
 from google.genai import errors, types
 from pydantic import ValidationError
@@ -19,6 +20,32 @@ class GeminiConfigurationError(RuntimeError):
 
 class GeminiAnalysisError(RuntimeError):
     pass
+
+
+def user_message_for_gemini_error(error: BaseException) -> str:
+    """Map provider failures to safe, actionable messages without exposing secrets."""
+    if isinstance(error, (TimeoutError, httpx.TimeoutException)):
+        return "Gemini не ответил вовремя. Повторите попытку позже."
+    if isinstance(error, httpx.NetworkError):
+        return "Нет соединения с Gemini. Проверьте интернет и повторите попытку."
+    if not isinstance(error, errors.APIError):
+        return "Не удалось связаться с Gemini. Проверьте интернет и повторите попытку."
+
+    code = error.code
+    message = str(error).lower()
+    if code in {401, 403} or "api_key" in message or "api key" in message:
+        return "Gemini не принял API-ключ или у ключа недостаточно прав."
+    if code == 400 and ("billing" in message or "free tier" in message):
+        return "Gemini недоступен для текущего региона без включённого биллинга Google AI Studio."
+    if "region" in message or "location" in message or "country" in message:
+        return "Gemini API недоступен в текущем регионе для этого Google-проекта."
+    if code == 404:
+        return "Выбранная модель Gemini или API endpoint недоступны для этого ключа."
+    if code == 429:
+        return "Квота Gemini исчерпана или превышен лимит запросов. Повторите позже."
+    if code in {408, 504}:
+        return "Gemini не ответил вовремя. Повторите попытку позже."
+    return "Gemini временно недоступен. Повторите попытку позже."
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,36 +104,28 @@ class GoogleGeminiClient:
         )
 
     def validate_access(self) -> None:
-        """Verify the key and configured model without generating any content."""
+        """Verify the key against the same generation endpoint used by the product."""
         try:
             with genai.Client(api_key=self.api_key, http_options=self._http_options()) as client:
-                client.models.get(model=self.settings.gemini_model)
-        except errors.APIError as error:
+                response = client.models.generate_content(
+                    model=self.settings.gemini_model,
+                    contents="Reply with OK.",
+                    config=types.GenerateContentConfig(max_output_tokens=8, temperature=0),
+                )
+                if not response.text:
+                    raise GeminiConfigurationError("Gemini не вернул ответ при проверке ключа.")
+        except GeminiConfigurationError:
+            raise
+        except (errors.APIError, httpx.HTTPError, TimeoutError) as error:
             logger.warning(
-                "Gemini key validation failed: model=%s code=%s",
+                "Gemini key validation failed: model=%s error_type=%s code=%s",
                 self.settings.gemini_model,
-                error.code,
+                type(error).__name__,
+                getattr(error, "code", None),
             )
-            message = str(error).lower()
-            if "location" in message or "region" in message:
-                detail = (
-                    "Gemini API недоступен из текущего региона. "
-                    "Проверьте доступность сервиса Google для вашей страны."
-                )
-            elif error.code in {400, 401, 403}:
-                detail = (
-                    "Gemini не принял API-ключ. Создайте новый ключ в Google AI Studio "
-                    "и убедитесь, что Gemini API включён."
-                )
-            elif error.code == 404:
-                detail = "Выбранная модель Gemini недоступна для этого API-ключа."
-            elif error.code == 429:
-                detail = "Квота Gemini исчерпана. Проверьте лимиты проекта Google AI Studio."
-            else:
-                detail = "Не удалось проверить API-ключ Gemini. Попробуйте позже."
-            raise GeminiConfigurationError(detail) from error
+            raise GeminiConfigurationError(user_message_for_gemini_error(error)) from error
         except Exception as error:
-            logger.exception("Unexpected Gemini key validation error")
+            logger.warning("Unexpected Gemini key validation error: type=%s", type(error).__name__)
             raise GeminiConfigurationError(
                 "Не удалось связаться с Gemini для проверки ключа. Проверьте интернет-соединение."
             ) from error
@@ -125,16 +144,14 @@ class GoogleGeminiClient:
                         max_output_tokens=4096,
                     ),
                 )
-        except errors.APIError as error:
+        except (errors.APIError, httpx.HTTPError, TimeoutError) as error:
             logger.warning(
-                "Gemini API request failed: model=%s code=%s",
+                "Gemini API request failed: model=%s error_type=%s code=%s",
                 self.settings.gemini_model,
-                error.code,
+                type(error).__name__,
+                getattr(error, "code", None),
             )
-            raise GeminiAnalysisError(
-                "Расшифровка готова, но Gemini временно недоступен. "
-                "Попробуйте повторить анализ позже."
-            ) from error
+            raise GeminiAnalysisError(user_message_for_gemini_error(error)) from error
         except Exception as error:
             logger.exception("Unexpected Gemini SDK error: model=%s", self.settings.gemini_model)
             raise GeminiAnalysisError(
@@ -197,15 +214,14 @@ AI-РАЗБОР — КОНЕЦ
                         max_output_tokens=2_048,
                     ),
                 )
-        except errors.APIError as error:
+        except (errors.APIError, httpx.HTTPError, TimeoutError) as error:
             logger.warning(
-                "Gemini chat request failed: model=%s code=%s",
+                "Gemini chat request failed: model=%s error_type=%s code=%s",
                 self.settings.gemini_model,
-                error.code,
+                type(error).__name__,
+                getattr(error, "code", None),
             )
-            raise GeminiAnalysisError(
-                "Gemini временно недоступен. Попробуйте отправить вопрос позже."
-            ) from error
+            raise GeminiAnalysisError(user_message_for_gemini_error(error)) from error
         except Exception as error:
             logger.exception("Unexpected Gemini chat error: model=%s", self.settings.gemini_model)
             raise GeminiAnalysisError(

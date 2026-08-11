@@ -52,6 +52,10 @@ class DesktopApi:
         logger.info("Opening recording studio in the system browser")
         return webbrowser.open(f"{self.app_url}/record", new=2)
 
+    def open_gemini_key_page(self) -> bool:
+        logger.info("Opening Google AI Studio in the system browser")
+        return webbrowser.open("https://aistudio.google.com/app/apikey", new=2)
+
     def requires_external_media_capture(self) -> bool:
         """Use a full browser for capture on macOS instead of the embedded WebView."""
         return sys.platform == "darwin"

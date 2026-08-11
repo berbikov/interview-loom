@@ -26,7 +26,7 @@ def template_values() -> dict[str, str]:
         "{{RELEASE_URL}}": release_url,
         "{{MAC_DOWNLOAD_URL}}": os.environ.get(
             "MAC_DOWNLOAD_URL",
-            f"{release_url}/download/Interview-Loom-macOS-arm64.zip",
+            f"{release_url}/download/Interview-Loom-macOS-arm64.dmg",
         ),
         "{{WINDOWS_DOWNLOAD_URL}}": (
             f"{release_url}/download/Interview-Loom-Setup-x64.exe"

@@ -222,6 +222,12 @@ async function prepareUploadedFile(file) {
     recordedBlob = file;
     previewUrl = URL.createObjectURL(file);
     durationSeconds = await readMediaDuration(previewUrl);
+    const maxDuration = Number.parseInt(fileUploadPanel.dataset.maxDuration, 10);
+    if (durationSeconds > maxDuration) {
+        resetPreparedMedia();
+        setStatus("Длительность видео превышает допустимые 60 минут.", true);
+        return;
+    }
     previewTitle.textContent = "Видео готово к загрузке";
     previewFileName.textContent = file.name;
     previewSection.hidden = false;

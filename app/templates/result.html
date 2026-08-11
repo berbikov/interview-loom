@@ -111,7 +111,7 @@
 </section>
 
 <section class="transcript-section">
-    <div class="transcript-heading"><div><p class="section-kicker">Расшифровка ответа</p><h2>Полный текст</h2></div><span>Whisper · RU</span></div>
+    <div class="transcript-heading"><div><p class="section-kicker">Расшифровка ответа</p><h2>Полный текст</h2></div><span>Whisper · {{ recording.transcription_language | upper }}</span></div>
     <article class="transcript-card"><p id="transcript-text">{{ recording.transcript or 'Расшифровка ещё не готова.' }}</p></article>
     <div class="result-actions"><a class="button button-dark" href="/record">Записать новый ответ <span>↗</span></a><a class="button button-light" href="/">Вернуться к записям</a></div>
 </section>

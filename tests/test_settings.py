@@ -49,6 +49,20 @@ def test_invalid_gemini_key_is_not_saved(
     assert secret_store.api_key is None
 
 
+def test_gemini_key_can_be_checked_without_saving(
+    client: TestClient,
+    secret_store: StubSecretStore,
+) -> None:
+    response = client.post(
+        "/api/settings/gemini/validate",
+        json={"api_key": "private-test-key"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["configured"] is False
+    assert secret_store.api_key is None
+
+
 def test_settings_page_never_contains_saved_key(
     client: TestClient,
     secret_store: StubSecretStore,
@@ -58,5 +72,5 @@ def test_settings_page_never_contains_saved_key(
     response = client.get("/settings")
 
     assert response.status_code == 200
-    assert "Сохранён" in response.text
+    assert "Gemini подключён" in response.text
     assert "private-test-key" not in response.text

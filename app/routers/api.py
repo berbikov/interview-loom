@@ -129,6 +129,32 @@ def update_gemini_settings(
     return build_gemini_settings_response(secret_store)
 
 
+@router.post(
+    "/api/settings/gemini/validate",
+    response_model=GeminiSettingsResponse,
+    tags=["settings"],
+)
+def validate_gemini_settings(
+    payload: GeminiSettingsUpdate,
+    secret_store: Annotated[SecretStoreProtocol, Depends(get_secret_store)],
+    analysis_service: Annotated[AnalysisServiceProtocol, Depends(get_analysis_service)],
+) -> GeminiSettingsResponse:
+    """Check a supplied key without persisting or returning it."""
+    if not secret_store.is_editable:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="В веб-режиме ключ настраивается на сервере.",
+        )
+    try:
+        analysis_service.validate_api_key(payload.api_key.get_secret_value())
+    except GeminiConfigurationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    return build_gemini_settings_response(secret_store)
+
+
 @router.delete(
     "/api/settings/gemini",
     response_model=GeminiSettingsResponse,
@@ -164,7 +190,7 @@ async def create_recording(
     title: Annotated[str, Form(min_length=1, max_length=200)],
     role: Annotated[str, Form(min_length=1, max_length=200)],
     interview_question: Annotated[str, Form(min_length=1, max_length=5000)],
-    duration_seconds: Annotated[float, Form(ge=0, le=14_400)],
+    duration_seconds: Annotated[float, Form(ge=0)],
     settings: Annotated[Settings, Depends(get_app_settings)],
     recording_processor: Annotated[
         RecordingProcessor,
@@ -172,11 +198,24 @@ async def create_recording(
     ],
     session: Annotated[Session, Depends(get_session)],
     job_description: Annotated[str | None, Form(max_length=10_000)] = None,
+    transcription_language: Annotated[str, Form()] = "ru",
 ) -> RecordingResponse:
     if not title.strip() or not role.strip() or not interview_question.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Название, должность и вопрос не могут быть пустыми.",
+        )
+
+    selected_language = transcription_language.strip().lower()
+    if selected_language not in {"ru", "en", "auto"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Выберите русский, английский или автоматическое определение языка.",
+        )
+    if duration_seconds > settings.max_video_duration_seconds:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="Длительность видео превышает максимально допустимые 60 минут.",
         )
 
     try:
@@ -218,6 +257,7 @@ async def create_recording(
         job_description=job_description.strip() if job_description else None,
         video_filename=saved_upload.stored_filename,
         video_mime_type=saved_upload.content_type,
+        transcription_language=selected_language,
         duration_seconds=duration_seconds,
         status=RecordingStatus.UPLOADED.value,
     )
@@ -391,7 +431,12 @@ def restart_recording_analysis(
             detail="Обработка этой записи уже выполняется.",
         )
 
-    recording.status = RecordingStatus.UPLOADED.value
+    has_saved_transcript = bool(recording.transcript)
+    recording.status = (
+        RecordingStatus.ANALYZING.value
+        if has_saved_transcript
+        else RecordingStatus.UPLOADED.value
+    )
     recording.error_message = None
     try:
         session.commit()
@@ -404,8 +449,12 @@ def restart_recording_analysis(
             detail="Не удалось повторно запустить обработку.",
         ) from error
 
-    background_tasks.add_task(recording_processor.process, recording.public_id)
-    logger.info("Recording processing restarted: public_id=%s", public_id)
+    if has_saved_transcript:
+        background_tasks.add_task(recording_processor.analyze_saved_transcript, recording.public_id)
+        logger.info("Saved transcript AI analysis restarted: public_id=%s", public_id)
+    else:
+        background_tasks.add_task(recording_processor.process, recording.public_id)
+        logger.info("Recording processing restarted: public_id=%s", public_id)
     return RecordingResponse.model_validate(recording)
 
 
