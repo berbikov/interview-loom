@@ -52,6 +52,10 @@ class DesktopApi:
         logger.info("Opening recording studio in the system browser")
         return webbrowser.open(f"{self.app_url}/record", new=2)
 
+    def requires_external_media_capture(self) -> bool:
+        """Use a full browser for capture on macOS instead of the embedded WebView."""
+        return sys.platform == "darwin"
+
 
 def desktop_data_dir() -> Path:
     return Path(user_data_path(APP_NAME, APP_AUTHOR, ensure_exists=True))

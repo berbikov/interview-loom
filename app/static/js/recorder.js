@@ -37,6 +37,7 @@ let usedCameraFallback = false;
 let uploadedFile = null;
 let activeSource = "record";
 let desktopBridgeReady = false;
+let requiresExternalMediaCapture = false;
 
 const supportedUploadTypes = new Set([
     "video/webm",
@@ -79,6 +80,33 @@ async function openSystemBrowserForRecording() {
         console.error("Could not open recording studio in system browser", error);
         setStatus("Не удалось открыть системный браузер.", true);
     }
+}
+
+async function shouldUseExternalMediaCapture() {
+    const desktopApi = await waitForDesktopApi();
+    if (!desktopApi?.requires_external_media_capture) {
+        return false;
+    }
+    try {
+        requiresExternalMediaCapture = Boolean(
+            await desktopApi.requires_external_media_capture()
+        );
+    } catch (error) {
+        console.warn("Could not determine desktop media capture surface", error);
+    }
+    return requiresExternalMediaCapture;
+}
+
+function mediaAccessErrorMessage(error) {
+    const errorName = error instanceof Error ? error.name : "";
+    const messages = {
+        NotAllowedError: "Камера или микрофон заблокированы. Разрешите доступ для браузера в настройках конфиденциальности macOS или Windows.",
+        NotFoundError: "Камера или микрофон не найдены. Подключите устройство и попробуйте ещё раз.",
+        NotReadableError: "Камера или микрофон заняты другим приложением. Закройте Zoom, Telegram или другие программы и повторите попытку.",
+        OverconstrainedError: "Выбранное устройство не поддерживает нужные параметры записи. Выберите другую камеру или микрофон.",
+        SecurityError: "Браузер заблокировал доступ к устройствам. Откройте запись в Safari, Chrome или Edge.",
+    };
+    return messages[errorName] || "Не удалось получить доступ к выбранным устройствам.";
 }
 
 function waitForDesktopApi(timeoutMilliseconds = 2500) {
@@ -356,7 +384,7 @@ async function prepareRecorderStream(mode) {
 
 async function startRecording() {
     activeSource = "record";
-    if (!supportsMediaRecording()) {
+    if (await shouldUseExternalMediaCapture() || !supportsMediaRecording()) {
         await openSystemBrowserForRecording();
         return;
     }
@@ -397,7 +425,7 @@ async function startRecording() {
     } catch (error) {
         stopMediaTracks();
         console.error("Could not start media recording", error);
-        setStatus("Не удалось получить доступ к выбранным устройствам.", true);
+        setStatus(mediaAccessErrorMessage(error), true);
     }
 }
 
@@ -532,12 +560,15 @@ function initializeDesktopMediaBridge() {
     }
     desktopBridgeReady = true;
     reportDesktopMediaCapabilities();
-    if (!supportsMediaRecording() && window.pywebview?.api?.open_recording_in_browser) {
-        startButton.textContent = "Открыть запись в браузере";
-        setStatus(
-            "Встроенное окно не поддерживает камеру. Запись откроется в системном браузере."
-        );
-    }
+    shouldUseExternalMediaCapture().then((useExternalCapture) => {
+        if ((useExternalCapture || !supportsMediaRecording())
+            && window.pywebview?.api?.open_recording_in_browser) {
+            startButton.textContent = "Открыть запись в браузере";
+            setStatus(
+                "Запись откроется в системном браузере — там можно выдать доступ к камере и микрофону."
+            );
+        }
+    });
 }
 
 if (window.pywebview?.api) {

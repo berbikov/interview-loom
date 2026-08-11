@@ -101,3 +101,17 @@ def test_desktop_api_opens_recording_in_system_browser(
 
     assert DesktopApi("http://127.0.0.1:49152").open_recording_in_browser()
     assert opened_urls == [("http://127.0.0.1:49152/record", 2)]
+
+
+@pytest.mark.parametrize(
+    ("platform", "expected"),
+    [("darwin", True), ("win32", False), ("linux", False)],
+)
+def test_desktop_api_uses_external_capture_only_on_macos(
+    platform: str,
+    expected: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("desktop.main.sys.platform", platform)
+
+    assert DesktopApi("http://127.0.0.1:49152").requires_external_media_capture() is expected
