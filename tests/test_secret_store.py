@@ -1,3 +1,5 @@
+import subprocess
+
 from app.services.secret_store import SystemKeyringSecretStore
 
 
@@ -29,3 +31,29 @@ def test_system_keyring_key_survives_new_store_instance(monkeypatch) -> None:
 
     SystemKeyringSecretStore().delete_gemini_api_key()
     assert SystemKeyringSecretStore().get_gemini_api_key() is None
+
+
+def test_macos_security_fallback_reads_key_without_exposing_it(monkeypatch) -> None:
+    def broken_keyring() -> InMemoryKeyring:
+        raise RuntimeError("Keychain backend unavailable")
+
+    monkeypatch.setattr(
+        SystemKeyringSecretStore,
+        "_keyring_module",
+        staticmethod(broken_keyring),
+    )
+    monkeypatch.setattr("app.services.secret_store.sys.platform", "darwin")
+    monkeypatch.setattr(
+        SystemKeyringSecretStore,
+        "_run_macos_security",
+        staticmethod(
+            lambda arguments: subprocess.CompletedProcess(
+                arguments,
+                0,
+                stdout="user-owned-key\n",
+                stderr="",
+            )
+        ),
+    )
+
+    assert SystemKeyringSecretStore().get_gemini_api_key() == "user-owned-key"

@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -22,25 +23,47 @@ class GeminiAnalysisError(RuntimeError):
     pass
 
 
+def normalize_gemini_api_key(api_key: str) -> str:
+    """Reject malformed values before an SDK can put them into HTTP headers."""
+    normalized = api_key.strip()
+    if not normalized:
+        raise GeminiConfigurationError("API-ключ не может быть пустым.")
+    if not normalized.isascii() or any(character.isspace() for character in normalized):
+        raise GeminiConfigurationError(
+            "Gemini API key содержит недопустимые символы. "
+            "Скопируйте ключ заново из Google AI Studio."
+        )
+    return normalized
+
+
 def user_message_for_gemini_error(error: BaseException) -> str:
     """Map provider failures to safe, actionable messages without exposing secrets."""
     if isinstance(error, (TimeoutError, httpx.TimeoutException)):
         return "Gemini не ответил вовремя. Повторите попытку позже."
     if isinstance(error, httpx.NetworkError):
         return "Нет соединения с Gemini. Проверьте интернет и повторите попытку."
+    if isinstance(error, UnicodeError):
+        return (
+            "Gemini API key содержит недопустимые символы. "
+            "Скопируйте ключ заново из Google AI Studio."
+        )
     if not isinstance(error, errors.APIError):
         return "Не удалось связаться с Gemini. Проверьте интернет и повторите попытку."
 
     code = error.code
     message = str(error).lower()
-    if code in {401, 403} or "api_key" in message or "api key" in message:
-        return "Gemini не принял API-ключ или у ключа недостаточно прав."
+    if code == 401 or "api_key" in message or "api key" in message:
+        return "Gemini не принял API-ключ. Проверьте ключ в Google AI Studio."
     if code == 400 and ("billing" in message or "free tier" in message):
         return "Gemini недоступен для текущего региона без включённого биллинга Google AI Studio."
     if "region" in message or "location" in message or "country" in message:
         return "Gemini API недоступен в текущем регионе для этого Google-проекта."
+    if code == 403:
+        return "У Gemini API key недостаточно прав для этого Google-проекта."
+    if code == 400:
+        return "Gemini отклонил запрос. Повторите AI-анализ после обновления приложения."
     if code == 404:
-        return "Выбранная модель Gemini или API endpoint недоступны для этого ключа."
+        return "Для этого ключа не найдена доступная модель Gemini с генерацией текста."
     if code == 429:
         return "Квота Gemini исчерпана или превышен лимит запросов. Повторите позже."
     if code in {408, 504}:
@@ -88,8 +111,9 @@ class GoogleGeminiClient:
     """Small adapter around the official Google Gen AI SDK."""
 
     def __init__(self, api_key: str, settings: Settings) -> None:
-        self.api_key = api_key
+        self.api_key = normalize_gemini_api_key(api_key)
         self.settings = settings
+        self._resolved_model: str | None = None
 
     def _http_options(self) -> types.HttpOptions:
         return types.HttpOptions(
@@ -104,11 +128,12 @@ class GoogleGeminiClient:
         )
 
     def validate_access(self) -> None:
-        """Verify the key against the same generation endpoint used by the product."""
+        """Check the current key using its model list and a minimal generation call."""
         try:
             with genai.Client(api_key=self.api_key, http_options=self._http_options()) as client:
+                model = self._resolve_model(client)
                 response = client.models.generate_content(
-                    model=self.settings.gemini_model,
+                    model=model,
                     contents="Reply with OK.",
                     config=types.GenerateContentConfig(max_output_tokens=8, temperature=0),
                 )
@@ -119,7 +144,7 @@ class GoogleGeminiClient:
         except (errors.APIError, httpx.HTTPError, TimeoutError) as error:
             logger.warning(
                 "Gemini key validation failed: model=%s error_type=%s code=%s",
-                self.settings.gemini_model,
+                self._resolved_model or "unresolved",
                 type(error).__name__,
                 getattr(error, "code", None),
             )
@@ -134,12 +159,13 @@ class GoogleGeminiClient:
         prompt = self._build_prompt(request)
         try:
             with genai.Client(api_key=self.api_key, http_options=self._http_options()) as client:
+                model = self._resolve_model(client)
                 response = client.models.generate_content(
-                    model=self.settings.gemini_model,
+                    model=model,
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_schema=AIAnalysis,
+                        response_schema=analysis_response_schema(),
                         temperature=0.2,
                         max_output_tokens=4096,
                     ),
@@ -147,13 +173,17 @@ class GoogleGeminiClient:
         except (errors.APIError, httpx.HTTPError, TimeoutError) as error:
             logger.warning(
                 "Gemini API request failed: model=%s error_type=%s code=%s",
-                self.settings.gemini_model,
+                self._resolved_model or "unresolved",
                 type(error).__name__,
                 getattr(error, "code", None),
             )
             raise GeminiAnalysisError(user_message_for_gemini_error(error)) from error
         except Exception as error:
-            logger.exception("Unexpected Gemini SDK error: model=%s", self.settings.gemini_model)
+            logger.warning(
+                "Unexpected Gemini SDK error: model=%s error_type=%s",
+                self._resolved_model or "unresolved",
+                type(error).__name__,
+            )
             raise GeminiAnalysisError(
                 "Расшифровка готова, но AI-анализ выполнить не удалось."
             ) from error
@@ -206,8 +236,9 @@ AI-РАЗБОР — КОНЕЦ
 """.strip()
         try:
             with genai.Client(api_key=self.api_key, http_options=self._http_options()) as client:
+                model = self._resolve_model(client)
                 response = client.models.generate_content(
-                    model=self.settings.gemini_model,
+                    model=model,
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         temperature=0.25,
@@ -217,13 +248,16 @@ AI-РАЗБОР — КОНЕЦ
         except (errors.APIError, httpx.HTTPError, TimeoutError) as error:
             logger.warning(
                 "Gemini chat request failed: model=%s error_type=%s code=%s",
-                self.settings.gemini_model,
+                self._resolved_model or "unresolved",
                 type(error).__name__,
                 getattr(error, "code", None),
             )
             raise GeminiAnalysisError(user_message_for_gemini_error(error)) from error
         except Exception as error:
-            logger.exception("Unexpected Gemini chat error: model=%s", self.settings.gemini_model)
+            logger.exception(
+                "Unexpected Gemini chat error: model=%s",
+                self._resolved_model or "unresolved",
+            )
             raise GeminiAnalysisError(
                 "Не удалось получить ответ AI-тренера."
             ) from error
@@ -232,6 +266,60 @@ AI-РАЗБОР — КОНЕЦ
         if not reply:
             raise GeminiAnalysisError("Gemini не вернул ответ на вопрос.")
         return reply[:10_000]
+
+    def _resolve_model(self, client: genai.Client) -> str:
+        """Select only a generateContent model exposed to this exact API key.
+
+        Google makes model availability project- and region-dependent. Listing models
+        before generation avoids treating a stale default model as a broken API key.
+        """
+        if self._resolved_model is not None:
+            return self._resolved_model
+
+        models = tuple(self._generation_model_names(client.models.list()))
+        if not models:
+            raise GeminiConfigurationError(
+                "Для этого Gemini API key нет доступных моделей для генерации текста. "
+                "Проверьте проект и регион в Google AI Studio."
+            )
+
+        preferred = self.settings.gemini_model.strip().removeprefix("models/")
+        if preferred and preferred.lower() != "auto" and preferred in models:
+            self._resolved_model = preferred
+            return preferred
+
+        self._resolved_model = self._prefer_text_model(models)
+        logger.info("Resolved Gemini model for current user key: model=%s", self._resolved_model)
+        return self._resolved_model
+
+    @staticmethod
+    def _generation_model_names(models: Iterable[object]) -> Iterable[str]:
+        for model in models:
+            name = getattr(model, "name", None)
+            actions = getattr(model, "supported_actions", ())
+            if not isinstance(name, str) or not isinstance(actions, (list, tuple)):
+                continue
+            if "generateContent" not in actions:
+                continue
+            normalized = name.removeprefix("models/")
+            if normalized:
+                yield normalized
+
+    @staticmethod
+    def _prefer_text_model(models: tuple[str, ...]) -> str:
+        """Prefer an ordinary Flash text model without naming an unlisted endpoint."""
+        def rank(model: str) -> tuple[int, str]:
+            name = model.lower()
+            excluded = ("image", "audio", "live", "tts", "robotics", "computer-use")
+            if any(part in name for part in excluded):
+                return (3, name)
+            if "flash" in name and "lite" not in name:
+                return (0, name)
+            if "flash" in name:
+                return (1, name)
+            return (2, name)
+
+        return min(models, key=rank)
 
     @staticmethod
     def _build_prompt(request: AnalysisRequest) -> str:
@@ -249,7 +337,8 @@ AI-РАЗБОР — КОНЕЦ
 {request.transcript}
 РАСШИФРОВКА — КОНЕЦ
 
-Верни практичный структурированный разбор. Все оценки — целые числа от 1 до 10.
+Верни практичный структурированный разбор. Все оценки — целые числа от 0 до 100.
+В criteria обязательно укажи structure, specificity, relevance, clarity и confidence.
 Сильные и слабые стороны, рекомендации и слова-паразиты должны опираться на
 текст ответа. Если слов-паразитов нет, верни пустой список filler_words.
 """.strip()
@@ -257,6 +346,47 @@ AI-РАЗБОР — КОНЕЦ
 
 def create_google_gemini_client(api_key: str, settings: Settings) -> GeminiClient:
     return GoogleGeminiClient(api_key, settings)
+
+
+def analysis_response_schema() -> dict[str, object]:
+    """Use Gemini's portable JSON-schema subset; validate strict limits locally."""
+    score = {"type": "integer"}
+    text = {"type": "string"}
+    return {
+        "type": "object",
+        "properties": {
+            "overall_score": score,
+            "criteria": {
+                "type": "object",
+                "properties": {
+                    "structure": score,
+                    "specificity": score,
+                    "relevance": score,
+                    "clarity": score,
+                    "confidence": score,
+                },
+                "required": ["structure", "specificity", "relevance", "clarity", "confidence"],
+            },
+            "summary": text,
+            "strengths": {"type": "array", "items": text},
+            "weaknesses": {"type": "array", "items": text},
+            "filler_words": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"word": text, "count": score},
+                    "required": ["word", "count"],
+                },
+            },
+            "recommendations": {"type": "array", "items": text},
+            "improved_answer": text,
+            "follow_up_question": text,
+        },
+        "required": [
+            "overall_score", "criteria", "summary", "strengths", "weaknesses",
+            "filler_words", "recommendations", "improved_answer", "follow_up_question",
+        ],
+    }
 
 
 class GeminiAnalysisService:
@@ -285,15 +415,13 @@ class GeminiAnalysisService:
             raise GeminiConfigurationError(str(error)) from error
         if api_key is None:
             raise GeminiConfigurationError(
-                "AI-анализ недоступен: переменная GEMINI_API_KEY не настроена."
+                "Добавьте Gemini API key в настройках, чтобы получить AI-анализ."
             )
         client = self.client_factory(api_key, self.settings)
         return client.generate_analysis(request)
 
     def validate_api_key(self, api_key: str) -> None:
-        normalized = api_key.strip()
-        if not normalized:
-            raise GeminiConfigurationError("API-ключ не может быть пустым.")
+        normalized = normalize_gemini_api_key(api_key)
         self.client_factory(normalized, self.settings).validate_access()
 
     def chat(self, request: InterviewChatRequest) -> str:

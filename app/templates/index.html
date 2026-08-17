@@ -121,7 +121,7 @@
         <a class="recording-row" href="/recordings/{{ item.public_id }}">
             <span class="recording-play">▶</span>
             <span class="recording-main"><strong>{{ item.title }}</strong><small>{{ item.role }} · {{ item.created_at.strftime('%d.%m.%Y') }}</small></span>
-            <span class="recording-status status-{{ item.status }}">{{ {'uploaded':'В очереди','transcribing':'Транскрибация','analyzing':'AI-анализ','completed':'Готово','failed':'Ошибка'}.get(item.status, item.status) }}</span>
+            <span class="recording-status status-{{ item.status }}">{{ {'uploaded':'В очереди','transcribing':'Транскрибация','transcription_completed':'Расшифровка готова','ai_analysis_processing':'AI-анализ','ai_analysis_failed':'AI-анализ не выполнен','completed':'Готово','failed':'Ошибка'}.get(item.status, item.status) }}</span>
             <span class="recording-arrow">↗</span>
         </a>
         {% endfor %}

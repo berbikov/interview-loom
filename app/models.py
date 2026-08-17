@@ -11,7 +11,9 @@ from app.database import Base
 class RecordingStatus(StrEnum):
     UPLOADED = "uploaded"
     TRANSCRIBING = "transcribing"
-    ANALYZING = "analyzing"
+    TRANSCRIPTION_COMPLETED = "transcription_completed"
+    AI_ANALYSIS_PROCESSING = "ai_analysis_processing"
+    AI_ANALYSIS_FAILED = "ai_analysis_failed"
     COMPLETED = "completed"
     FAILED = "failed"
 

@@ -43,7 +43,10 @@ class Settings(BaseSettings):
     whisper_normalize_audio: bool = True
     whisper_model_dir: Path = DEFAULT_DATA_ROOT / "models"
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-3.6-flash"
+    # "auto" resolves a text-generation model from the models available to the
+    # current user's AI Studio key. A concrete name can be supplied for support
+    # diagnostics, but is never used unless that model is listed for the key.
+    gemini_model: str = "auto"
     gemini_timeout_seconds: int = Field(default=60, ge=5, le=300)
     gemini_retry_attempts: int = Field(default=3, ge=1, le=5)
     log_level: str = "INFO"

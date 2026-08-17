@@ -75,7 +75,7 @@ def test_missing_gemini_api_key_is_handled_without_client_call(tmp_path: Path) -
     )
 
     assert service.is_configured is False
-    with pytest.raises(GeminiConfigurationError, match="GEMINI_API_KEY"):
+    with pytest.raises(GeminiConfigurationError, match="Добавьте Gemini API key"):
         service.analyze(ANALYSIS_REQUEST)
     assert factory_calls == 0
 
@@ -96,7 +96,7 @@ def test_gemini_service_uses_key_and_returns_validated_analysis(tmp_path: Path) 
 
     result = service.analyze(ANALYSIS_REQUEST)
 
-    assert result.overall_score == 7
+    assert result.overall_score == 70
     assert received_api_keys == ["test-secret"]
     assert client.requests == [ANALYSIS_REQUEST]
 
@@ -138,9 +138,14 @@ class StubSDKModels:
             assert contents == "Reply with OK."
         return self.response
 
-    def get(self, *, model: str) -> object:
-        self.model_names.append(model)
-        return object()
+    def list(self) -> list[object]:
+        return [
+            type(
+                "ModelInfo",
+                (),
+                {"name": "models/gemini-test-flash", "supported_actions": ["generateContent"]},
+            )()
+        ]
 
 
 class StubSDKClient:
@@ -183,7 +188,7 @@ def test_google_sdk_adapter_uses_structured_response_without_network(
 
     assert result == expected
     assert received_keys == ["test-secret"]
-    assert sdk_client.models.model_names == ["gemini-3.6-flash"]
+    assert sdk_client.models.model_names == ["gemini-test-flash"]
 
 
 def test_google_sdk_validates_key_with_minimal_generation_request(
@@ -201,7 +206,37 @@ def test_google_sdk_validates_key_with_minimal_generation_request(
 
     client.validate_access()
 
-    assert sdk_client.models.model_names == ["gemini-3.6-flash"]
+    assert sdk_client.models.model_names == ["gemini-test-flash"]
+
+
+def test_google_sdk_uses_only_model_listed_for_current_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = StubGeminiClient().generate_analysis(ANALYSIS_REQUEST)
+    sdk_client = StubSDKClient(StubSDKResponse(expected))
+    monkeypatch.setattr("app.services.gemini.genai.Client", lambda **_: sdk_client)
+    settings = build_settings(tmp_path, None).model_copy(
+        update={"gemini_model": "gemini-unavailable-model"}
+    )
+
+    result = GoogleGeminiClient("test-secret", settings).generate_analysis(ANALYSIS_REQUEST)
+
+    assert result == expected
+    assert sdk_client.models.model_names == ["gemini-test-flash"]
+
+
+def test_gemini_key_with_non_ascii_characters_is_rejected_before_request(
+    tmp_path: Path,
+) -> None:
+    service = GeminiAnalysisService(
+        settings=(settings := build_settings(tmp_path, None)),
+        secret_store=EnvironmentSecretStore(settings),
+        client_factory=lambda api_key, configured_settings: StubGeminiClient(),
+    )
+
+    with pytest.raises(GeminiConfigurationError, match="недопустимые символы"):
+        service.validate_api_key("не-api-key")
 
 
 @pytest.mark.parametrize(
@@ -209,7 +244,7 @@ def test_google_sdk_validates_key_with_minimal_generation_request(
     [
         (401, "API key not valid", "не принял API-ключ"),
         (403, "permission denied", "недостаточно прав"),
-        (404, "not found", "модель Gemini или API endpoint"),
+        (404, "not found", "не найдена доступная модель Gemini"),
         (429, "quota exhausted", "Квота Gemini"),
         (400, "free tier is not supported in your country", "биллинга"),
     ],

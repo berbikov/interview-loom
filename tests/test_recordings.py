@@ -145,7 +145,7 @@ def test_restart_recording_analysis(
     refreshed = client.get(f"/api/recordings/{public_id}")
 
     assert response.status_code == 202
-    assert response.json()["status"] == "analyzing"
+    assert response.json()["status"] == "transcription_completed"
     assert refreshed.json()["status"] == "completed"
     assert len(transcription_service.processed_paths) == 1
     assert len(analysis_service.requests) == 2
@@ -189,6 +189,11 @@ class FailingAnalysisService:
         raise GeminiAnalysisError("Gemini временно недоступен.")
 
 
+class AnalysisFailingChatWorkingService(FailingAnalysisService):
+    def chat(self, request: InterviewChatRequest) -> str:
+        return f"Ответ по расшифровке: {request.question}"
+
+
 def test_gemini_error_preserves_transcript(test_settings: Settings) -> None:
     application = create_app(
         test_settings,
@@ -200,7 +205,7 @@ def test_gemini_error_preserves_transcript(test_settings: Settings) -> None:
         response = failing_client.get(f"/api/recordings/{created['public_id']}")
 
     assert response.status_code == 200
-    assert response.json()["status"] == "completed"
+    assert response.json()["status"] == "ai_analysis_failed"
     assert response.json()["transcript"] == "Это тестовая расшифровка интервью."
     assert response.json()["analysis_json"] is None
     assert response.json()["error_message"] == "Gemini временно недоступен."
@@ -216,10 +221,29 @@ def test_missing_key_completes_with_transcript_only(test_settings: Settings) -> 
         response = no_key_client.get(f"/api/recordings/{created['public_id']}")
 
     assert response.status_code == 200
-    assert response.json()["status"] == "completed"
+    assert response.json()["status"] == "transcription_completed"
     assert response.json()["transcript"] == "Это тестовая расшифровка интервью."
     assert response.json()["analysis_json"] is None
-    assert response.json()["error_message"] is None
+    assert "Добавьте Gemini API key" in response.json()["error_message"]
+
+
+def test_ai_chat_uses_saved_transcript_when_automatic_analysis_failed(
+    test_settings: Settings,
+) -> None:
+    application = create_app(
+        test_settings,
+        transcription_service=StubTranscriptionService(),
+        analysis_service=AnalysisFailingChatWorkingService(),
+    )
+    with TestClient(application) as failing_client:
+        created = create_test_recording(failing_client)
+        response = failing_client.post(
+            f"/api/recordings/{created['public_id']}/chat",
+            json={"question": "Что улучшить?"},
+        )
+
+    assert response.status_code == 200
+    assert "Что улучшить?" in response.json()["content"]
 
 
 def test_result_page_contains_polling_client(client: TestClient) -> None:

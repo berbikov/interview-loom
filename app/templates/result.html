@@ -8,7 +8,7 @@
         <a class="back-link" href="/">← Все записи</a>
         <div class="result-title-row">
             <div><p class="section-kicker">AI-разбор интервью</p><h1>{{ recording.title }}</h1></div>
-            <span id="header-status" class="header-status status-{{ recording.status }}">{{ {'uploaded':'В очереди','transcribing':'Транскрибация','analyzing':'AI-анализ','completed':'Готово','failed':'Ошибка'}.get(recording.status, recording.status) }}</span>
+            <span id="header-status" class="header-status status-{{ recording.status }}">{{ {'uploaded':'В очереди','transcribing':'Транскрибация','transcription_completed':'Расшифровка готова','ai_analysis_processing':'AI-анализ','ai_analysis_failed':'AI-анализ не выполнен','completed':'Готово','failed':'Ошибка'}.get(recording.status, recording.status) }}</span>
         </div>
         <div class="result-meta-line"><span>{{ recording.role }}</span><i></i><span>{{ recording.created_at.strftime('%d.%m.%Y · %H:%M') }}</span><i></i><span id="recording-duration">{{ recording.duration_seconds | round(1) }} сек.</span></div>
     </div>
@@ -28,7 +28,7 @@
     <span id="status-badge" class="status-badge">{{ recording.status }}</span>
     <div id="progress-track" class="progress-track" role="progressbar" aria-label="Прогресс обработки" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10"><span id="progress-bar" class="progress-bar"></span></div>
     <p id="processing-error" class="processing-error" role="alert" {% if not recording.error_message %}hidden{% endif %}>{{ recording.error_message or '' }}</p>
-    <button id="reanalyze-button" class="button button-light reanalyze-button" type="button">Повторить обработку <span>↻</span></button>
+    <button id="reanalyze-button" class="button button-light reanalyze-button" type="button">Повторить AI-анализ <span>↻</span></button>
 </section>
 
 <section class="result-media-grid">
@@ -42,7 +42,7 @@
     </article>
 </section>
 
-<section id="analysis-workspace" class="analysis-workspace {% if recording.status in ['uploaded', 'transcribing', 'analyzing'] %}is-processing{% endif %} {% if analysis %}has-analysis{% endif %}">
+<section id="analysis-workspace" class="analysis-workspace {% if recording.status in ['uploaded', 'transcribing', 'ai_analysis_processing'] %}is-processing{% endif %} {% if analysis %}has-analysis{% endif %}">
     <div class="workspace-heading"><div><p class="section-kicker">Персональный разбор</p><h2>Ваш ответ глазами интервьюера</h2></div><span class="ai-label">✦ Gemini AI</span></div>
 
     <div class="analysis-skeleton" aria-label="AI-анализ загружается">
@@ -51,7 +51,7 @@
         <div class="skeleton-card"><span></span><span></span><span></span></div>
     </div>
 
-    <div id="analysis-empty" class="analysis-empty" {% if analysis or recording.status in ['uploaded', 'transcribing', 'analyzing'] %}hidden{% endif %}>
+    <div id="analysis-empty" class="analysis-empty" {% if analysis or recording.status in ['uploaded', 'transcribing', 'ai_analysis_processing'] %}hidden{% endif %}>
         <span>✦</span>
         {% if gemini_configured %}
         <h3>AI-разбор пока недоступен</h3><p>Расшифровка сохранена. Попробуйте повторить обработку — Gemini мог быть временно недоступен.</p>
@@ -63,12 +63,12 @@
     <div id="analysis-content" class="analysis-content" {% if not analysis %}hidden{% endif %}>
         <div class="score-overview">
             <article class="overall-card">
-                <div class="overall-copy"><p>Общий балл</p><strong><span id="overall-score">{{ analysis.overall_score if analysis else '—' }}</span><small>/10</small></strong><em id="score-caption">Сильный ответ</em></div>
-                <div class="score-dial" id="score-dial" style="--score: {{ (analysis.overall_score * 10) if analysis else 0 }}%"><span>✦</span></div>
+                <div class="overall-copy"><p>Общий балл</p><strong><span id="overall-score">{{ analysis.overall_score if analysis else '—' }}</span><small>/100</small></strong><em id="score-caption">Сильный ответ</em></div>
+                <div class="score-dial" id="score-dial" style="--score: {{ analysis.overall_score if analysis else 0 }}%"><span>✦</span></div>
             </article>
             <div class="metric-cards">
-                {% for key, label, value in [('structure','Структура',analysis.structure_score if analysis else 0),('clarity','Ясность',analysis.clarity_score if analysis else 0),('specificity','Конкретика',analysis.specificity_score if analysis else 0)] %}
-                <article class="metric-card"><div><span>{{ label }}</span><strong id="{{ key }}-score">{{ value }}</strong></div><div class="metric-track"><i id="{{ key }}-bar" style="width: {{ value * 10 }}%"></i></div><small>{{ 'Логика и последовательность' if key == 'structure' else ('Простота формулировок' if key == 'clarity' else 'Факты, цифры, примеры') }}</small></article>
+                {% for key, label, value, description in [('structure','Структура',analysis.criteria.structure if analysis else 0,'Логика и последовательность'),('clarity','Ясность',analysis.criteria.clarity if analysis else 0,'Простота формулировок'),('specificity','Конкретика',analysis.criteria.specificity if analysis else 0,'Факты, цифры, примеры'),('relevance','Релевантность',analysis.criteria.relevance if analysis else 0,'Ответ на вопрос'),('confidence','Уверенность',analysis.criteria.confidence if analysis else 0,'Тон и определённость')] %}
+                <article class="metric-card"><div><span>{{ label }}</span><strong id="{{ key }}-score">{{ value }}</strong></div><div class="metric-track"><i id="{{ key }}-bar" style="width: {{ value }}%"></i></div><small>{{ description }}</small></article>
                 {% endfor %}
             </div>
         </div>

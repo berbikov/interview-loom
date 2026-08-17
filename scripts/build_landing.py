@@ -17,6 +17,18 @@ def template_values() -> dict[str, str]:
     slug = repository_slug()
     repository_url = f"https://github.com/{slug}"
     release_url = f"{repository_url}/releases/latest"
+    release_tag = os.environ.get("WINDOWS_RELEASE_TAG", "v1.2.0").strip()
+    has_local_macos_archive = (RELEASE_DIR / "Interview-Loom-macOS-arm64.zip").is_file()
+    mac_download_url = os.environ.get("MAC_DOWNLOAD_URL")
+    if not mac_download_url:
+        mac_download_url = (
+            "downloads/Interview-Loom-macOS-arm64.zip"
+            if has_local_macos_archive
+            else f"{release_url}/download/Interview-Loom-macOS-arm64.zip"
+        )
+    windows_download_url = (
+        f"{repository_url}/releases/download/{release_tag}/Interview-Loom-Setup-x64.exe"
+    )
     return {
         "{{SITE_URL}}": os.environ.get(
             "SITE_URL",
@@ -24,13 +36,8 @@ def template_values() -> dict[str, str]:
         ).rstrip("/"),
         "{{REPOSITORY_URL}}": repository_url,
         "{{RELEASE_URL}}": release_url,
-        "{{MAC_DOWNLOAD_URL}}": os.environ.get(
-            "MAC_DOWNLOAD_URL",
-            f"{release_url}/download/Interview-Loom-macOS-arm64.dmg",
-        ),
-        "{{WINDOWS_DOWNLOAD_URL}}": (
-            f"{release_url}/download/Interview-Loom-Setup-x64.exe"
-        ),
+        "{{MAC_DOWNLOAD_URL}}": mac_download_url,
+        "{{WINDOWS_DOWNLOAD_URL}}": windows_download_url,
     }
 
 

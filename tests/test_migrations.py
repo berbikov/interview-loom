@@ -19,7 +19,7 @@ def test_startup_applies_alembic_migration(
             "SELECT version_num FROM alembic_version"
         ).fetchone()
 
-    assert version == ("20260811_04",)
+    assert version == ("20260811_05",)
 
 
 def test_legacy_sqlite_is_backed_up_before_migration(tmp_path: Path) -> None:
