@@ -18,9 +18,12 @@ def test_landing_template_values_use_repository_release(
 
     assert "{{" not in rendered
     assert "https://interview.example" in rendered
-    assert "github.com/example/interview-loom/releases/latest/download" in rendered
-    assert "Interview-Loom-macOS-arm64.dmg" in rendered
-    assert "Interview-Loom-Setup-x64.exe" in rendered
+    assert "downloads/Interview-Loom-macOS-arm64.zip" in rendered
+    assert "Interview-Loom-macOS-arm64.zip" in rendered
+    assert (
+        "https://github.com/example/interview-loom/releases/download/v1.2.0/"
+        "Interview-Loom-Setup-x64.exe"
+    ) in rendered
 
 
 def test_landing_verifier_supports_github_pages_subpath(tmp_path) -> None:

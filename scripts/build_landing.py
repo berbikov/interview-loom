@@ -17,6 +17,10 @@ def template_values() -> dict[str, str]:
     slug = repository_slug()
     repository_url = f"https://github.com/{slug}"
     release_url = f"{repository_url}/releases/latest"
+    release_tag = os.environ.get("WINDOWS_RELEASE_TAG", "v1.2.0").strip()
+    windows_download_url = (
+        f"{repository_url}/releases/download/{release_tag}/Interview-Loom-Setup-x64.exe"
+    )
     return {
         "{{SITE_URL}}": os.environ.get(
             "SITE_URL",
@@ -26,11 +30,9 @@ def template_values() -> dict[str, str]:
         "{{RELEASE_URL}}": release_url,
         "{{MAC_DOWNLOAD_URL}}": os.environ.get(
             "MAC_DOWNLOAD_URL",
-            f"{release_url}/download/Interview-Loom-macOS-arm64.dmg",
+            "downloads/Interview-Loom-macOS-arm64.zip",
         ),
-        "{{WINDOWS_DOWNLOAD_URL}}": (
-            f"{release_url}/download/Interview-Loom-Setup-x64.exe"
-        ),
+        "{{WINDOWS_DOWNLOAD_URL}}": windows_download_url,
     }
 
 

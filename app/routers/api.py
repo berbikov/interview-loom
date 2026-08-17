@@ -33,6 +33,7 @@ from app.schemas import (
     ChatQuestion,
     GeminiSettingsResponse,
     GeminiSettingsUpdate,
+    GeminiSettingsValidation,
     HealthResponse,
     RecordingResponse,
 )
@@ -135,7 +136,7 @@ def update_gemini_settings(
     tags=["settings"],
 )
 def validate_gemini_settings(
-    payload: GeminiSettingsUpdate,
+    payload: GeminiSettingsValidation,
     secret_store: Annotated[SecretStoreProtocol, Depends(get_secret_store)],
     analysis_service: Annotated[AnalysisServiceProtocol, Depends(get_analysis_service)],
 ) -> GeminiSettingsResponse:
@@ -146,7 +147,16 @@ def validate_gemini_settings(
             detail="В веб-режиме ключ настраивается на сервере.",
         )
     try:
-        analysis_service.validate_api_key(payload.api_key.get_secret_value())
+        api_key = (
+            payload.api_key.get_secret_value()
+            if payload.api_key is not None
+            else secret_store.get_gemini_api_key()
+        )
+        if api_key is None:
+            raise GeminiConfigurationError(
+                "Добавьте Gemini API key в настройках, затем повторите проверку."
+            )
+        analysis_service.validate_api_key(api_key)
     except GeminiConfigurationError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -424,7 +434,8 @@ def restart_recording_analysis(
         )
     if recording.status in {
         RecordingStatus.TRANSCRIBING.value,
-        RecordingStatus.ANALYZING.value,
+        RecordingStatus.AI_ANALYSIS_PROCESSING.value,
+        "analyzing",
     }:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -433,7 +444,7 @@ def restart_recording_analysis(
 
     has_saved_transcript = bool(recording.transcript)
     recording.status = (
-        RecordingStatus.ANALYZING.value
+        RecordingStatus.TRANSCRIPTION_COMPLETED.value
         if has_saved_transcript
         else RecordingStatus.UPLOADED.value
     )

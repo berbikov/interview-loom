@@ -33,7 +33,13 @@ const statusView = {
         message: "Превращаем аудиодорожку в полный текст ответа.",
         progress: 52,
     },
-    analyzing: {
+    transcription_completed: {
+        label: "Расшифровка готова",
+        title: "Расшифровка сохранена",
+        message: "Подключите Gemini или повторите AI-анализ — видео больше не обрабатывается.",
+        progress: 68,
+    },
+    ai_analysis_processing: {
         label: "AI-анализ",
         title: "Gemini разбирает ответ",
         message: "Оцениваем структуру, ясность, конкретику и готовим рекомендации.",
@@ -44,6 +50,12 @@ const statusView = {
         title: "Разбор готов",
         message: "Результат сохранён. Возвращайтесь к нему в любое время.",
         progress: 100,
+    },
+    ai_analysis_failed: {
+        label: "AI-анализ не выполнен",
+        title: "Расшифровка готова, AI-анализ не выполнен",
+        message: "Текст сохранён. Повторите только AI-анализ после устранения причины.",
+        progress: 86,
     },
     failed: {
         label: "Ошибка",
@@ -67,6 +79,16 @@ function parseAnalysis(rawAnalysis) {
     }
     try {
         const parsed = JSON.parse(rawAnalysis);
+        if (parsed && typeof parsed === "object" && !parsed.criteria) {
+            parsed.overall_score = Number(parsed.overall_score || 0) * 10;
+            parsed.criteria = {
+                structure: Number(parsed.structure_score || 0) * 10,
+                specificity: Number(parsed.specificity_score || 0) * 10,
+                relevance: 50,
+                clarity: Number(parsed.clarity_score || 0) * 10,
+                confidence: 50,
+            };
+        }
         return parsed && typeof parsed === "object" ? parsed : null;
     } catch (error) {
         console.error("Could not parse stored AI analysis", error);
@@ -124,15 +146,15 @@ function renderAnalysis(analysis) {
     analysisEmpty.hidden = true;
 
     document.querySelector("#overall-score").textContent = analysis.overall_score;
-    document.querySelector("#score-caption").textContent = analysis.overall_score >= 8
+    document.querySelector("#score-caption").textContent = analysis.overall_score >= 80
         ? "Сильный ответ"
-        : analysis.overall_score >= 6 ? "Хорошая база" : "Есть точки роста";
-    document.querySelector("#score-dial").style.setProperty("--score", `${analysis.overall_score * 10}%`);
+        : analysis.overall_score >= 60 ? "Хорошая база" : "Есть точки роста";
+    document.querySelector("#score-dial").style.setProperty("--score", `${analysis.overall_score}%`);
 
-    ["structure", "clarity", "specificity"].forEach((metric) => {
-        const value = analysis[`${metric}_score`];
+    ["structure", "clarity", "specificity", "relevance", "confidence"].forEach((metric) => {
+        const value = analysis.criteria[metric];
         document.querySelector(`#${metric}-score`).textContent = value;
-        document.querySelector(`#${metric}-bar`).style.width = `${value * 10}%`;
+        document.querySelector(`#${metric}-bar`).style.width = `${value}%`;
     });
 
     document.querySelector("#analysis-summary").textContent = analysis.summary;
@@ -147,7 +169,7 @@ function renderAnalysis(analysis) {
 function renderRecording(recording) {
     const view = statusView[recording.status] || statusView.uploaded;
     const analysis = parseAnalysis(recording.analysis_json);
-    const processing = ["uploaded", "transcribing", "analyzing"].includes(recording.status);
+    const processing = ["uploaded", "transcribing", "ai_analysis_processing"].includes(recording.status);
 
     statusBadge.textContent = view.label;
     headerStatus.textContent = view.label;
@@ -169,7 +191,10 @@ function renderRecording(recording) {
     processingError.textContent = recording.error_message || "";
     processingError.hidden = !recording.error_message;
     reanalyzeButton.disabled = processing;
-    reanalyzeButton.hidden = processing;
+    reanalyzeButton.hidden = processing || !recording.transcript;
+    reanalyzeButton.firstChild.textContent = recording.transcript
+        ? "Повторить AI-анализ "
+        : "Повторить обработку ";
 
     if (analysis) {
         renderAnalysis(analysis);
@@ -178,11 +203,9 @@ function renderRecording(recording) {
         analysisWorkspace.classList.remove("has-analysis");
         analysisContent.hidden = true;
         analysisEmpty.hidden = false;
-        if (recording.status === "completed") {
+        if (recording.status === "transcription_completed") {
             processingTitle.textContent = "Расшифровка готова";
-            processingMessage.textContent = recording.error_message
-                ? "Текст сохранён, но AI-разбор недоступен."
-                : "Текст сохранён. Для AI-разбора настройте ключ Gemini.";
+            processingMessage.textContent = "Текст сохранён. Для AI-разбора подключите Gemini или повторите анализ.";
         }
     }
 
@@ -212,7 +235,7 @@ async function pollRecording() {
 async function restartAnalysis() {
     reanalyzeButton.disabled = true;
     processingError.hidden = true;
-    processingMessage.textContent = "Запускаем повторную обработку…";
+    processingMessage.textContent = "Запускаем AI-анализ по сохранённой расшифровке…";
     try {
         const response = await fetch(`/api/recordings/${publicId}/analyze`, {
             method: "POST",

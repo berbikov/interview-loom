@@ -79,26 +79,23 @@ class RecordingProcessor:
         analysis_request: AnalysisRequest,
         detected_language: str | None = None,
     ) -> None:
-        if not self.analysis_service.is_configured:
-            self._mark_completed_without_analysis(public_id)
+        try:
+            self._mark_ai_analysis_processing(public_id)
+            analysis = self.analysis_service.analyze(analysis_request)
+        except GeminiConfigurationError as error:
+            self._mark_transcription_completed(public_id, str(error))
             logger.info(
-                "Transcription completed without Gemini configuration: public_id=%s language=%s",
+                "AI analysis skipped because Gemini is not configured: public_id=%s language=%s",
                 public_id,
                 detected_language or "saved",
             )
             return
-
-        try:
-            analysis = self.analysis_service.analyze(analysis_request)
-        except GeminiConfigurationError:
-            self._mark_completed_without_analysis(public_id)
-            return
         except GeminiAnalysisError as error:
-            self._mark_completed_without_analysis(public_id, str(error))
+            self._mark_ai_analysis_failed(public_id, str(error))
             return
         except Exception:
             logger.exception("Unexpected AI analysis error: public_id=%s", public_id)
-            self._mark_completed_without_analysis(
+            self._mark_ai_analysis_failed(
                 public_id,
                 "Расшифровка готова, но AI-анализ выполнить не удалось.",
             )
@@ -110,7 +107,8 @@ class RecordingProcessor:
         interrupted_statuses = {
             RecordingStatus.UPLOADED.value,
             RecordingStatus.TRANSCRIBING.value,
-            RecordingStatus.ANALYZING.value,
+            RecordingStatus.AI_ANALYSIS_PROCESSING.value,
+            "analyzing",
             "processing",
         }
         try:
@@ -169,7 +167,7 @@ class RecordingProcessor:
                 recording.transcript = clean_transcript
                 if duration_seconds > 0:
                     recording.duration_seconds = duration_seconds
-                recording.status = RecordingStatus.ANALYZING.value
+                recording.status = RecordingStatus.TRANSCRIPTION_COMPLETED.value
                 recording.error_message = None
                 request = AnalysisRequest(
                     transcript=clean_transcript,
@@ -195,7 +193,6 @@ class RecordingProcessor:
                 )
                 if recording is None or not recording.transcript:
                     return None
-                recording.status = RecordingStatus.ANALYZING.value
                 recording.analysis_json = None
                 recording.error_message = None
                 request = AnalysisRequest(
@@ -208,11 +205,25 @@ class RecordingProcessor:
                 return request
         except SQLAlchemyError:
             logger.exception("Could not start saved transcript analysis: public_id=%s", public_id)
-            self._mark_completed_without_analysis(
+            self._mark_ai_analysis_failed(
                 public_id,
                 "Не удалось повторно запустить AI-анализ.",
             )
             return None
+
+    def _mark_ai_analysis_processing(self, public_id: str) -> None:
+        try:
+            with self.database.session() as session:
+                recording = session.scalar(
+                    select(InterviewRecording).where(InterviewRecording.public_id == public_id)
+                )
+                if recording is None:
+                    return
+                recording.status = RecordingStatus.AI_ANALYSIS_PROCESSING.value
+                recording.error_message = None
+                session.commit()
+        except SQLAlchemyError:
+            logger.exception("Could not mark AI analysis as processing: public_id=%s", public_id)
 
     def _save_analysis(self, public_id: str, analysis_json: str) -> None:
         try:
@@ -228,17 +239,17 @@ class RecordingProcessor:
                 session.commit()
         except SQLAlchemyError:
             logger.exception("Could not save AI analysis: public_id=%s", public_id)
-            self._mark_completed_without_analysis(
+            self._mark_ai_analysis_failed(
                 public_id,
                 "Расшифровка готова, но AI-анализ не удалось сохранить.",
             )
             return
         logger.info("Recording AI analysis completed: public_id=%s", public_id)
 
-    def _mark_completed_without_analysis(
+    def _mark_transcription_completed(
         self,
         public_id: str,
-        message: str | None = None,
+        message: str,
     ) -> None:
         try:
             with self.database.session() as session:
@@ -247,11 +258,25 @@ class RecordingProcessor:
                 )
                 if recording is None:
                     return
-                recording.status = RecordingStatus.COMPLETED.value
+                recording.status = RecordingStatus.TRANSCRIPTION_COMPLETED.value
                 recording.error_message = message
                 session.commit()
         except SQLAlchemyError:
-            logger.exception("Could not complete recording: public_id=%s", public_id)
+            logger.exception("Could not persist transcription-only state: public_id=%s", public_id)
+
+    def _mark_ai_analysis_failed(self, public_id: str, message: str) -> None:
+        try:
+            with self.database.session() as session:
+                recording = session.scalar(
+                    select(InterviewRecording).where(InterviewRecording.public_id == public_id)
+                )
+                if recording is None:
+                    return
+                recording.status = RecordingStatus.AI_ANALYSIS_FAILED.value
+                recording.error_message = message
+                session.commit()
+        except SQLAlchemyError:
+            logger.exception("Could not persist AI analysis failure: public_id=%s", public_id)
 
     def _mark_failed(self, public_id: str, message: str) -> None:
         try:

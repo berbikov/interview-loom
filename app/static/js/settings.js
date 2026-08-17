@@ -22,9 +22,15 @@ if (settingsForm) {
     }
 
     visibilityButton.addEventListener("click", () => {
+        const selectionStart = keyInput.selectionStart;
+        const selectionEnd = keyInput.selectionEnd;
         const reveal = keyInput.type === "password";
         keyInput.type = reveal ? "text" : "password";
         visibilityButton.textContent = reveal ? "Скрыть" : "Показать";
+        keyInput.focus({ preventScroll: true });
+        if (selectionStart !== null && selectionEnd !== null) {
+            keyInput.setSelectionRange(selectionStart, selectionEnd);
+        }
     });
 
     getKeyLink.addEventListener("click", async (event) => {
@@ -71,7 +77,7 @@ if (settingsForm) {
     });
 
     validateButton.addEventListener("click", async () => {
-        if (!settingsForm.reportValidity()) {
+        if (keyInput.value && !settingsForm.reportValidity()) {
             return;
         }
         validateButton.disabled = true;
@@ -80,13 +86,13 @@ if (settingsForm) {
             const response = await fetch("/api/settings/gemini/validate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Accept: "application/json" },
-                body: JSON.stringify({ api_key: keyInput.value }),
+                body: JSON.stringify(keyInput.value ? { api_key: keyInput.value } : {}),
             });
             const payload = await response.json();
             if (!response.ok) {
                 throw new Error(payload.detail || "Не удалось проверить ключ.");
             }
-            showMessage("Подключение подтверждено. Нажмите «Сохранить ключ».");
+            showMessage(keyInput.value ? "Подключение подтверждено. Нажмите «Сохранить ключ»." : "Gemini подключён и готов к AI-анализу.");
         } catch (error) {
             showMessage(error instanceof Error ? error.message : "Не удалось проверить ключ.", true);
         } finally {
