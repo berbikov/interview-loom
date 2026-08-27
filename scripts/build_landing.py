@@ -17,18 +17,16 @@ def template_values() -> dict[str, str]:
     slug = repository_slug()
     repository_url = f"https://github.com/{slug}"
     release_url = f"{repository_url}/releases/latest"
-    release_tag = os.environ.get("WINDOWS_RELEASE_TAG", "v1.2.0").strip()
+    include_local_archive = os.environ.get("INCLUDE_LOCAL_MAC_ARCHIVE") == "1"
     has_local_macos_archive = (RELEASE_DIR / "Interview-Loom-macOS-arm64.zip").is_file()
     mac_download_url = os.environ.get("MAC_DOWNLOAD_URL")
     if not mac_download_url:
         mac_download_url = (
             "downloads/Interview-Loom-macOS-arm64.zip"
-            if has_local_macos_archive
+            if include_local_archive and has_local_macos_archive
             else f"{release_url}/download/Interview-Loom-macOS-arm64.zip"
         )
-    windows_download_url = (
-        f"{repository_url}/releases/download/{release_tag}/Interview-Loom-Setup-x64.exe"
-    )
+    windows_download_url = f"{release_url}/download/Interview-Loom-Setup-x64.exe"
     return {
         "{{SITE_URL}}": os.environ.get(
             "SITE_URL",
@@ -49,6 +47,7 @@ def render(text: str, values: dict[str, str]) -> str:
 
 
 def main() -> None:
+    include_local_archive = os.environ.get("INCLUDE_LOCAL_MAC_ARCHIVE") == "1"
     if OUTPUT_DIR.exists():
         shutil.rmtree(OUTPUT_DIR)
     OUTPUT_DIR.mkdir(parents=True)
@@ -71,7 +70,9 @@ def main() -> None:
         "Interview-Loom-macOS-arm64.sha256",
         "Interview-Loom-macOS-arm64.manifest.json",
     )
-    if all((RELEASE_DIR / filename).is_file() for filename in mac_release_files):
+    if include_local_archive and all(
+        (RELEASE_DIR / filename).is_file() for filename in mac_release_files
+    ):
         downloads_dir.mkdir()
         for filename in mac_release_files:
             shutil.copy2(RELEASE_DIR / filename, downloads_dir / filename)
